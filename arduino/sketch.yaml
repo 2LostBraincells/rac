@@ -1,2 +1,2 @@
-default_fqbn: arduino:avr:uno
-default_port: /dev/cu.usbmodem1101
+default_fqbn: arduino:avr:mega
+default_port: /dev/ttyACM0
