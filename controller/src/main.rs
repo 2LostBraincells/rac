@@ -1,6 +1,7 @@
 use std::{thread::sleep, time::Duration};
 
 use crate::communication::Connection;
+use crate::robot::*;
 
 mod communication;
 mod kinematics;
@@ -10,12 +11,14 @@ mod robot;
 fn main() {
     // open serial connection
 
-    let mut robot = robot::Arm {
-        base: robot::Angle(0.),
-        shoulder: robot::Angle(80.),
-        elbow: robot::Angle(100.),
-        claw: robot::Angle(110.),
-        connection: Connection::default(),
+    let mut robot = Robot {
+        angles: Arm {
+            base: Angle(30.),
+            shoulder: Angle(90.),
+            elbow: Angle(110.),
+            claw: Angle(100.),
+        },
+        ..Robot::new(10., 10.,)
     };
 
     robot.connection.connect().expect("Could not connect");

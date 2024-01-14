@@ -1,23 +1,9 @@
-use std::cmp::max;
+use std::{cmp::max, f32::consts::PI};
 
 use crate::robot::*;
-use gilrs::{Button, Event, Gamepad, Gilrs, Axis};
 
-const MAX_SPEED: f32 = 0.25;
-const DEAD_ZONE: f32 = 0.1;
 
 use self::geometry::triangle::a_from_lengths;
-
-pub struct Position {
-    /// Width
-    x: f32,
-
-    /// Height
-    y: f32,
-
-    /// Depth
-    z: f32,
-}
 
 pub struct SpherePos {
     pub azmut: f32,
@@ -26,37 +12,7 @@ pub struct SpherePos {
     pub f_dst: f32,
 }
 
-pub struct Robot {
-    pub position: Position,
-    pub angles: Arm,
-    pub upper_arm: f32,
-    pub lower_arm: f32,
-    pub square_sum: f32,
-    pub claw_open: bool,
-}
-
-impl Default for Position {
-    fn default() -> Self {
-        Self {
-            x: 0.,
-            y: 0.,
-            z: 0.,
-        }
-    }
-}
-
 impl Robot {
-    pub fn new(lower_arm: f32, upper_arm: f32) -> Robot {
-        Robot {
-            position: Position::default(),
-            angles: Arm::default(),
-            upper_arm,
-            lower_arm,
-            square_sum: upper_arm * upper_arm + lower_arm * lower_arm,
-            claw_open: false,
-        }
-    }
-
     pub fn inverse_kinematics(&mut self) {
         let pos = &self.position;
         let spos = &self.position.to_sphere();
@@ -67,27 +23,17 @@ impl Robot {
             let x = (spos.f_dst / pos.y).atan();
             let y = a_from_lengths(spos.dst, self.lower_arm, self.upper_arm);
 
-            x + y
+            if x + y > PI / 2. { 
+                PI - x - y
+            } else {
+                x + y
+            }
         };
 
         self.angles.base = Angle(spos.azmut.to_degrees());
         self.angles.shoulder = Angle(alpha.to_degrees());
         self.angles.elbow = Angle(beta.to_degrees());
     }
-
-    pub fn update_position(&mut self, gamepad: Gamepad) {
-        let right_stick_axis_x = gamepad.value(Axis::RightStickX);
-        let right_stick_axis_y = gamepad.value(Axis::RightStickY);
-        let left_stick_axis_x = gamepad.value(Axis::LeftStickX);
-        let left_stick_axis_y = gamepad.value(Axis::LeftStickY);
-
-        if right_stick_axis_x.abs() > DEAD_ZONE { self.position.z += MAX_SPEED * right_stick_axis_x; }
-        if right_stick_axis_y.abs() > DEAD_ZONE { self.position.x += MAX_SPEED * right_stick_axis_y; }
-        if left_stick_axis_y.abs() > DEAD_ZONE { self.position.y += MAX_SPEED * left_stick_axis_x; }
-        if gamepad.is_pressed(Button::LeftTrigger2) { self.claw_open = !self.claw_open; }
-    }
-
-    
 }
 
 #[cfg(test)]
@@ -105,9 +51,9 @@ mod test {
 
         robot.inverse_kinematics();
 
-        assert_eq!(robot.angles.base.inner(), &0.);
-        assert_eq!(robot.angles.shoulder.inner(), &135.);
-        assert_eq!(robot.angles.elbow.inner(), &90.);
+        assert_eq!(robot.angles.base.inner().round(), 0.);
+        assert_eq!(robot.angles.shoulder.inner().round(), 45.);
+        assert_eq!(robot.angles.elbow.inner().round(), 90.);
     }
 }
 
