@@ -127,6 +127,8 @@ impl PartialEq for Position {
     }
 }
 
+impl Eq for Position {}
+
 impl Sub for Position {
     type Output = Self;
 
@@ -171,6 +173,16 @@ impl AddAssign for Position {
     }
 }
 
+impl SpherePos {
+    pub fn to_position(&self) -> Position {
+        Position::new(
+            self.f_dst * self.azmut.cos(),
+            self.dst * self.polar.sin(),
+            self.f_dst * self.azmut.sin(),
+        )
+    }
+}
+
 pub mod triangle {
     /// The angles for the corner between a and b in radians
     ///
@@ -199,7 +211,8 @@ pub mod triangle {
 }
 
 #[cfg(test)]
-mod test {
+mod position {
+
     use std::f64::consts::SQRT_2;
 
     use crate::{
@@ -247,5 +260,38 @@ mod test {
         b -= c;
 
         assert_eq!(b, Position::new(-1., 0., 1.));
+    }
+}
+
+#[cfg(test)]
+mod sphere_pos {
+    use std::f64::consts::{SQRT_2, PI};
+    use crate::kinematics::{Position, SpherePos};
+
+    #[test]
+    fn to_position() {
+        let pos = SpherePos {
+            azmut: 1.,
+            polar: 1.,
+            f_dst: 0.,
+            dst: 0.,
+        };
+
+        let actual = pos.to_position();
+        let expected = Position::new(0., 0., 0.);
+
+        assert_eq!(actual, expected);
+
+        let pos = SpherePos {
+            azmut: PI / 4.,
+            polar: 0.,
+            f_dst: SQRT_2,
+            dst: SQRT_2,
+        };
+
+        let actual = pos.to_position();
+        let expected = Position::new(1., 0., 1.);
+
+        assert_eq!(actual, expected);
     }
 }
