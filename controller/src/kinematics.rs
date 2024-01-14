@@ -1,9 +1,10 @@
-use std::{cmp::max, f64::consts::PI};
+use std::{cmp::max, f64::consts::PI, ops::{Sub, Add, AddAssign}};
 
 use crate::robot::*;
 
 use self::geometry::triangle::a_from_lengths;
 
+#[derive(Debug, Clone, Copy)]
 pub struct SpherePos {
     /// Azmut angle
     pub azmut: f64,
@@ -18,16 +19,16 @@ pub struct SpherePos {
     pub f_dst: f64,
 }
 
-impl Robot {
-    pub fn inverse_kinematics(&mut self) {
-        let pos = &self.position;
-        let spos = &self.position.to_sphere();
+impl Position{
+    pub fn inverse_kinematics(&mut self, upper_arm: f64, lower_arm: f64) -> Arm {
+        let pos = &self;
+        let spos = &self.to_sphere();
 
-        let beta = a_from_lengths(self.lower_arm, self.upper_arm, spos.dst);
+        let beta = a_from_lengths(upper_arm, lower_arm, spos.dst);
 
         let alpha = {
             let x = (spos.f_dst / pos.y).atan();
-            let y = a_from_lengths(spos.dst, self.lower_arm, self.upper_arm);
+            let y = a_from_lengths(spos.dst, lower_arm, upper_arm);
 
             if x + y > PI / 2. { 
                 PI - x - y
@@ -36,9 +37,12 @@ impl Robot {
             }
         };
 
-        self.angles.base = Angle(spos.azmut.to_degrees() + 90.);
-        self.angles.shoulder = Angle(alpha.to_degrees());
-        self.angles.elbow = Angle(beta.to_degrees());
+        Arm {
+            base: Angle(spos.azmut.to_degrees() + 90.),
+            shoulder: Angle(alpha.to_degrees()),
+            elbow: Angle(beta.to_degrees()),
+            claw: Angle(0.)
+        }
     }
 }
 
@@ -55,9 +59,9 @@ mod test {
         robot.position.z = SQRT_2;
         robot.position.y = 0.;
 
-        robot.inverse_kinematics();
+        robot.update_ik();
 
-        assert_eq!(robot.angles.base.inner().round(), 0.);
+        assert_eq!(robot.angles.base.inner().round(), 90.);
         assert_eq!(robot.angles.shoulder.inner().round(), 45.);
         assert_eq!(robot.angles.elbow.inner().round(), 90.);
     }
@@ -92,6 +96,18 @@ mod geometry {
     }
 }
 
+pub struct NoNan(f64);
+
+impl NoNan {
+    pub fn inner(&self) -> &f64 {
+        if self.0.is_nan() {
+            &0.
+        } else {
+            &self.0
+        }
+    }
+}
+
 impl Position {
     pub fn to_sphere(&self) -> SpherePos {
         // sqrt(X^2 + Z^2)
@@ -107,10 +123,54 @@ impl Position {
         let polar = (f_dst / self.y).atan();
 
         SpherePos {
-            azmut,
-            polar,
-            dst,
-            f_dst,
+            azmut: *NoNan(azmut).inner(),
+            polar: *NoNan(polar).inner(),
+            dst: *NoNan(dst).inner(),
+            f_dst: *NoNan(f_dst).inner(),
+        }
+    }
+}
+
+impl Sub for Position {
+    type Output = Position;
+
+    fn sub(self, rhs: Position) -> Self::Output {
+        Position {
+            x: self.x - rhs.x,
+            y: self.y - rhs.y,
+            z: self.z - rhs.z,
+        }
+    }
+}
+
+impl Add for Position {
+    type Output = Position;
+
+    fn add(self, rhs: Position) -> Self::Output {
+        Position {
+            x: self.x + rhs.x,
+            y: self.y + rhs.y,
+            z: self.z + rhs.z,
+        }
+    }
+}
+
+impl AddAssign for Position {
+    fn add_assign(&mut self, rhs: Position) {
+        *self = Position {
+            x: self.x + rhs.x,
+            y: self.y + rhs.y,
+            z: self.z + rhs.z,
+        } 
+    }
+}
+
+impl SpherePos {
+    pub fn to_position(&self) -> Position {
+        Position {
+            x: self.dst * self.azmut.cos(),
+            y: self.dst * self.polar.sin(),
+            z: self.dst * self.azmut.sin(),
         }
     }
 }

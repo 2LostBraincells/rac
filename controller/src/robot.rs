@@ -4,6 +4,7 @@ use gilrs::{Axis, Button, Gamepad};
 // controller constants pub const MAX_SPEED: f64 = 0.25;
 pub const DEAD_ZONE: f64 = 0.2;
 pub const MAX_SPEED: f64 = 10.;
+pub const MAX_TRAVEL_SPEED: f64 = 10.;
 
 // servo angles
 pub const MAX_ANGLE: f64 = 180.0;
@@ -16,13 +17,17 @@ pub const MIN_SERVO: u16 = 250;
 /// Defines a robot and its physical properties
 pub struct Robot {
     pub position: Position,
+    pub target_position: Position,
     pub angles: Arm,
     pub upper_arm: f64,
     pub lower_arm: f64,
     pub square_sum: f64,
     pub claw_open: bool,
     pub connection: Connection,
+    pub macros: Macros,
 }
+
+pub struct Macros(Position, Position, Position, Position);
 
 /// Defines a position in 3d space
 #[derive(Debug, Copy, Clone)]
@@ -63,17 +68,19 @@ impl Robot {
     pub fn new(lower_arm: f64, upper_arm: f64) -> Robot {
         Robot {
             position: Position::default(),
+            target_position: Position::default(),
             angles: Arm::default(),
             upper_arm,
             lower_arm,
             square_sum: upper_arm * upper_arm + lower_arm * lower_arm,
             claw_open: false,
             connection: Connection::default(),
+            macros: Macros::default(),
         }
     }
 
-    pub fn update_position(&mut self, gamepad: &Gamepad, delta: f64) {
-        let previous_position = self.position.clone();
+    pub fn update_controller(&mut self, gamepad: &Gamepad, delta: f64) {
+        let previous_position = self.target_position.clone();
 
         let right_stick_axis_x = gamepad.value(Axis::RightStickX) as f64;
         let right_stick_axis_y = gamepad.value(Axis::RightStickY) as f64;
@@ -85,17 +92,47 @@ impl Robot {
         let y_speed = MAX_SPEED * delta * right_stick_axis_y;
 
         if left_stick_axis_y.abs() > DEAD_ZONE {
-            self.position.z += z_speed;
+            self.target_position.z += z_speed;
         }
         if left_stick_axis_x.abs() > DEAD_ZONE {
-            self.position.x += x_speed;
+            self.target_position.x += x_speed;
         }
         if right_stick_axis_y.abs() > DEAD_ZONE {
-            self.position.y += y_speed;
+            self.target_position.y += y_speed;
         }
         if gamepad.is_pressed(Button::LeftTrigger2) {
             self.claw_open = !self.claw_open;
         }
+
+        // if gamepad.is_pressed(Button::North) {
+        //     if gamepad.is_pressed(Button::Select) {
+        //         self.macros.0 = self.position.clone();
+        //     } else {
+        //         self.target_position = self.macros.0.clone();
+        //     }
+        // }
+        // if gamepad.is_pressed(Button::East) {
+        //     if gamepad.is_pressed(Button::Select) {
+        //         self.macros.1 = self.position.clone();
+        //     } else {
+        //         self.target_position = self.macros.1.clone();
+        //     }
+        // }
+        // if gamepad.is_pressed(Button::South) {
+        //     if gamepad.is_pressed(Button::Select) {
+        //         self.macros.2 = self.position.clone();
+        //     } else {
+        //         self.target_position = self.macros.2.clone();
+        //     }
+        // }
+        // if gamepad.is_pressed(Button::West) {
+        //     if gamepad.is_pressed(Button::Select) {
+        //         self.macros.3 = self.position.clone();
+        //     } else {
+        //         self.target_position = self.macros.3.clone();
+        //     }
+        // }
+
         if gamepad.is_pressed(Button::Start) {
             panic!(
                 "Start button pressed \
@@ -113,14 +150,32 @@ FU§CK SHIT FUC KSHIRTA SSHIUTw\
             );
         }
 
-        if self.position.to_sphere().dst > self.upper_arm + self.lower_arm {
-            self.position = previous_position;
+        if self.target_position.to_sphere().dst > self.upper_arm + self.lower_arm 
+            && self.target_position.to_sphere().polar < 0. 
+            && self.target_position.to_sphere().azmut{
+            self.target_position = previous_position;
         }
     }
 
+    pub fn update_position(&mut self) {
+        let mut delta_sphere = (self.target_position - self.position).to_sphere();
+        delta_sphere.dst = MAX_TRAVEL_SPEED.min(delta_sphere.dst);
+        self.position += delta_sphere.to_position();
+    }
+
+    pub fn update_ik(&mut self) {
+        self.angles = Arm {
+            claw: self.angles.claw,
+            ..self
+                .position
+                .inverse_kinematics(self.upper_arm, self.lower_arm)
+        };
+    }
+
     pub fn update(&mut self, gamepad: &Gamepad, delta: f64) -> Result<(), ComError> {
-        self.update_position(gamepad, delta);
-        self.inverse_kinematics();
+        self.update_controller(gamepad, delta);
+        self.update_position();
+        self.update_ik();
         let data = self.angles.to_servos().to_message();
         self.connection.write(&data, true)
     }
@@ -133,6 +188,17 @@ impl Default for Position {
             y: 0.,
             z: 0.,
         }
+    }
+}
+
+impl Default for Macros {
+    fn default() -> Self {
+        Self(
+            Default::default(),
+            Default::default(),
+            Default::default(),
+            Default::default(),
+        )
     }
 }
 

@@ -47,6 +47,7 @@ fn main() {
         }
 
         clearscreen::clear().unwrap();
+        println!("{:?}", robot.target_position);
         println!("{:?}", robot.position);
         println!("{:?}", robot.angles);
     }
