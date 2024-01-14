@@ -3,7 +3,7 @@ use std::{io::Read, thread::sleep, time::Duration};
 mod kinematics;
 mod robot;
 
-use crate::robot::robot::*;
+use crate::robot::*;
 
 // cummunication
 const PREFIX: &u8 = &b'\r';
