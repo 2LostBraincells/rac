@@ -123,7 +123,9 @@ impl Into<u16> for Angle {
 
 impl PartialEq for Angle {
     fn eq(&self, other: &Self) -> bool {
-        self.0 == other.0
+        let left = (self.0 * 10.0f64.powi(4)).round() / 10.0f64.powi(4);
+        let right = (other.0 * 10.0f64.powi(4)).round() / 10.0f64.powi(4);
+        left == right
     }
 }
 
