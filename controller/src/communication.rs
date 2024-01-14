@@ -1,10 +1,10 @@
-use std::{collections::VecDeque, time::Duration};
+use std::{collections::VecDeque, time::{Duration, Instant}};
 
 use serialport::{Error, SerialPort};
 
 /// port for arduino communication
 const ARDUINO_PORT: &str = "/dev/ttyACM0";
-const ARDUINO_BAUD: u32 = 38400;
+const ARDUINO_BAUD: u32 = 115200;
 
 /// Indicates a new message
 const PREFIX: u8 = b'\r';
@@ -22,6 +22,9 @@ const LOG_LEVEL: u8 = 5;
 pub struct Connection {
     pub port: Option<Box<dyn SerialPort>>,
 
+    /// Instant of last write
+    pub last_write: Instant,
+
     /// buffer for reading messages into
     pub read_buf: Vec<u8>,
 
@@ -36,6 +39,7 @@ pub struct Connection {
 #[derive(Debug)]
 pub enum ComError {
     NotConnected,
+    Ratelimit,
     Error(std::io::Error),
 }
 
@@ -45,6 +49,7 @@ impl Default for Connection {
     fn default() -> Self {
         Self {
             port: None,
+            last_write: Instant::now(),
             read_buf: Vec::new(),
             msg_buf: VecDeque::new(),
             no_connect: false,
@@ -69,7 +74,7 @@ impl Connection {
         // connect arduino
         self.port = Some(
             serialport::new(ARDUINO_PORT, ARDUINO_BAUD)
-                .timeout(Duration::from_secs(1))
+                .timeout(Duration::from_millis(100))
                 .open()?,
         );
         Ok(())
@@ -119,7 +124,7 @@ impl Connection {
     ///
     /// # Returns
     /// `Ok` if the data was transmitted successfully `Err` otherwise
-    pub fn write(&mut self, data: &[u8]) -> Result<(), ComError> {
+    pub fn write(&mut self, data: &[u8], allow_drooped: bool) -> Result<(), ComError> {
         let mut message: Vec<u8> = Vec::with_capacity(data.len() + 2);
 
         message.push(b'\r');
@@ -127,7 +132,19 @@ impl Connection {
             message.push(*byte);
         }
 
-        self.write_raw(message.as_slice())
+        if !allow_drooped {
+            unreachable!("im to lazy to make it work otherwise");
+        }
+        
+
+         // if (Instant::now() - self.last_write) > Duration::from_millis(10) {
+         //     self.last_write = Instant::now();
+         // } else {
+         //     println!("Ratelimiting ({}s left)", (Instant::now() - self.last_write).as_secs_f32());
+         //     Err(ComError::Ratelimit)
+         // }
+         self.write_raw(message.as_slice())
+
     }
 
     /// Read from serial buffer and return if a valid message was recived

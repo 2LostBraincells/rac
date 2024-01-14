@@ -1,4 +1,4 @@
-use std::{cmp::max, f32::consts::PI};
+use std::{cmp::max, f64::consts::PI};
 
 use crate::robot::*;
 
@@ -6,16 +6,16 @@ use self::geometry::triangle::a_from_lengths;
 
 pub struct SpherePos {
     /// Azmut angle
-    pub azmut: f32,
+    pub azmut: f64,
 
     /// Polar angle
-    pub polar: f32,
+    pub polar: f64,
 
     /// 3d distance from origin
-    pub dst: f32,
+    pub dst: f64,
 
     /// Distance from origin on flat ground
-    pub f_dst: f32,
+    pub f_dst: f64,
 }
 
 impl Robot {
@@ -36,7 +36,7 @@ impl Robot {
             }
         };
 
-        self.angles.base = Angle(spos.azmut.to_degrees());
+        self.angles.base = Angle(spos.azmut.to_degrees() + 90.);
         self.angles.shoulder = Angle(alpha.to_degrees());
         self.angles.elbow = Angle(beta.to_degrees());
     }
@@ -44,7 +44,7 @@ impl Robot {
 
 #[cfg(test)]
 mod test {
-    use std::f32::consts::SQRT_2;
+    use std::f64::consts::SQRT_2;
 
     use crate::kinematics::Robot;
 
@@ -70,7 +70,7 @@ mod geometry {
         /// x = -c^2 + a^2 + b^2
         /// y = 2ab
         /// arccos(x/y)
-        pub fn a_from_lengths(a: f32, b: f32, c: f32) -> f32 {
+        pub fn a_from_lengths(a: f64, b: f64, c: f64) -> f64 {
             let x = -(c * c) + a * a + b * b;
             let y = 2. * a * b;
             (x / y).acos()
