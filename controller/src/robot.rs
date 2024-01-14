@@ -1,3 +1,6 @@
+use crate::communication::{Connection, ComError};
+
+
 // servo angles
 pub const MAX_ANGLE: f32 = 180.0;
 pub const MIN_ANGLE: f32 = 0.0;
@@ -10,16 +13,18 @@ pub const MIN_SERVO: u16 = 250;
 #[derive(Debug, Copy, Clone)]
 pub struct Angle(pub f32);
 
+
 /// Very specific names for servos
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug)]
 pub struct Arm {
     pub base: Angle,
     pub shoulder: Angle,
     pub elbow: Angle,
     pub claw: Angle,
+    pub connection: Connection
 }
 
-/// angle to servo fucky microseccond
+/// convert servo position represented as an angle into values understod by the servo
 impl Into<u16> for Angle {
     fn into(self) -> u16 {
         let factor = (self.0 - MIN_ANGLE) / MAX_ANGLE;
@@ -31,6 +36,7 @@ impl Into<u16> for Angle {
 impl Default for Arm {
     fn default() -> Self {
         Self {
+            connection: Connection::default(),
             base: Angle(0.),
             shoulder: Angle(0.),
             elbow: Angle(0.),
@@ -48,6 +54,11 @@ impl Arm {
             elbow: self.elbow.into(),
             claw: self.claw.into(),
         }
+    }
+
+    pub fn update(&mut self) -> Result<(), ComError> {
+        let data = self.to_servos().to_message();
+        self.connection.write(&data)
     }
 }
 
