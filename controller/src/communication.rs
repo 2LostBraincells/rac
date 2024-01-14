@@ -6,6 +6,9 @@ use serialport::{Error, SerialPort};
 const ARDUINO_PORT: &str = "/dev/ttyACM0";
 const ARDUINO_BAUD: u32 = 38400;
 
+/// Indicates a new message
+const PREFIX: u8 = b'\r';
+
 /// Logging level all levels include the ones before
 /// 0 = no logs
 /// 1 = errors
@@ -155,7 +158,7 @@ impl Connection {
 
         for byte in buf {
             match byte {
-                b'\r' => self.read_buf.clear(),
+                PREFIX => self.read_buf.clear(),
                 byte => {
                     if self.read_buf.len() == 8 {
                         self.msg_buf.push_back(self.read_buf.clone());
