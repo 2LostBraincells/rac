@@ -1,5 +1,5 @@
-use crate::communication::{Connection, ComError};
-use gilrs::{Button, Gamepad, Axis};
+use crate::communication::{ComError, Connection};
+use gilrs::{Axis, Button, Gamepad};
 
 // controller constants
 pub const MAX_SPEED: f32 = 0.25;
@@ -13,7 +13,19 @@ pub const MIN_ANGLE: f32 = 0.0;
 pub const MAX_SERVO: u16 = 2400;
 pub const MIN_SERVO: u16 = 250;
 
+/// Defines a robot and its physical properties
+pub struct Robot {
+    pub position: Position,
+    pub angles: Arm,
+    pub upper_arm: f32,
+    pub lower_arm: f32,
+    pub square_sum: f32,
+    pub claw_open: bool,
+    pub connection: Connection,
+}
+
 /// Defines a position in 3d space
+#[derive(Debug, Copy, Clone)]
 pub struct Position {
     /// Width
     pub x: f32,
@@ -25,25 +37,26 @@ pub struct Position {
     pub z: f32,
 }
 
-impl Default for Position {
-    fn default() -> Self {
-        Self {
-            x: 0.,
-            y: 0.,
-            z: 0.,
-        }
-    }
+/// Defines a servo angle, but with more functions on it
+#[derive(Debug, Copy, Clone)]
+pub struct Angle(pub f32);
+
+/// Very specific names for servos
+#[derive(Debug, Copy, Clone)]
+pub struct Arm {
+    pub base: Angle,
+    pub shoulder: Angle,
+    pub elbow: Angle,
+    pub claw: Angle,
 }
 
-/// Defines a robot and its physical properties
-pub struct Robot {
-    pub position: Position,
-    pub angles: Arm,
-    pub upper_arm: f32,
-    pub lower_arm: f32,
-    pub square_sum: f32,
-    pub claw_open: bool,
-    pub connection: Connection,
+/// quirky arm
+#[derive(Debug, Copy, Clone)]
+pub struct Servos {
+    pub base: u16,
+    pub shoulder: u16,
+    pub elbow: u16,
+    pub claw: u16,
 }
 
 impl Robot {
@@ -59,35 +72,42 @@ impl Robot {
         }
     }
 
-    pub fn update_position(&mut self, gamepad: Gamepad) {
+    pub fn update_position(&mut self, gamepad: &Gamepad) {
         let right_stick_axis_x = gamepad.value(Axis::RightStickX);
         let right_stick_axis_y = gamepad.value(Axis::RightStickY);
         let left_stick_axis_x = gamepad.value(Axis::LeftStickX);
         let left_stick_axis_y = gamepad.value(Axis::LeftStickY);
 
-        if right_stick_axis_x.abs() > DEAD_ZONE { self.position.z += MAX_SPEED * right_stick_axis_x; }
-        if right_stick_axis_y.abs() > DEAD_ZONE { self.position.x += MAX_SPEED * right_stick_axis_y; }
-        if left_stick_axis_y.abs() > DEAD_ZONE { self.position.y += MAX_SPEED * left_stick_axis_x; }
-        if gamepad.is_pressed(Button::LeftTrigger2) { self.claw_open = !self.claw_open; }
+        if right_stick_axis_x.abs() > DEAD_ZONE {
+            self.position.z += MAX_SPEED * right_stick_axis_x;
+        }
+        if right_stick_axis_y.abs() > DEAD_ZONE {
+            self.position.x += MAX_SPEED * right_stick_axis_y;
+        }
+        if left_stick_axis_y.abs() > DEAD_ZONE {
+            self.position.y += MAX_SPEED * left_stick_axis_x;
+        }
+        if gamepad.is_pressed(Button::LeftTrigger2) {
+            self.claw_open = !self.claw_open;
+        }
     }
-    pub fn update(&mut self) -> Result<(), ComError> {
+
+    pub fn update(&mut self, gamepad: &Gamepad) -> Result<(), ComError> {
+        self.update_position(gamepad);
+        self.inverse_kinematics();
         let data = self.angles.to_servos().to_message();
         self.connection.write(&data)
     }
 }
 
-/// Defines a servo angle, but with more functions on it
-#[derive(Debug, Copy, Clone)]
-pub struct Angle(pub f32);
-
-
-/// Very specific names for servos
-#[derive(Debug)]
-pub struct Arm {
-    pub base: Angle,
-    pub shoulder: Angle,
-    pub elbow: Angle,
-    pub claw: Angle,
+impl Default for Position {
+    fn default() -> Self {
+        Self {
+            x: 0.,
+            y: 0.,
+            z: 0.,
+        }
+    }
 }
 
 /// convert servo position represented as an angle into values understod by the servo
@@ -130,16 +150,6 @@ impl Arm {
             claw: self.claw.into(),
         }
     }
-
-}
-
-/// quirky arm
-#[derive(Debug, Copy, Clone)]
-pub struct Servos {
-    pub base: u16,
-    pub shoulder: u16,
-    pub elbow: u16,
-    pub claw: u16,
 }
 
 impl Servos {
