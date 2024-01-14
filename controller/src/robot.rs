@@ -1,4 +1,4 @@
-use crate::communication::{ComError, Connection};
+use crate::{communication::{ComError, Connection}, kinematics::Position};
 use gilrs::{Axis, Button, Gamepad};
 
 // controller constants pub const MAX_SPEED: f64 = 0.25;
@@ -22,19 +22,6 @@ pub struct Robot {
     pub square_sum: f64,
     pub claw_open: bool,
     pub connection: Connection,
-}
-
-/// Defines a position in 3d space
-#[derive(Debug, Copy, Clone)]
-pub struct Position {
-    /// Width
-    pub x: f64,
-
-    /// Height
-    pub y: f64,
-
-    /// Depth
-    pub z: f64,
 }
 
 /// Defines a servo angle, but with more functions on it
@@ -75,7 +62,6 @@ impl Robot {
     pub fn update_position(&mut self, gamepad: &Gamepad, delta: f64) {
         let previous_position = self.position.clone();
 
-        let right_stick_axis_x = gamepad.value(Axis::RightStickX) as f64;
         let right_stick_axis_y = gamepad.value(Axis::RightStickY) as f64;
         let left_stick_axis_x = gamepad.value(Axis::LeftStickX) as f64;
         let left_stick_axis_y = gamepad.value(Axis::LeftStickY) as f64;
@@ -97,20 +83,7 @@ impl Robot {
             self.claw_open = !self.claw_open;
         }
         if gamepad.is_pressed(Button::Start) {
-            panic!(
-                "Start button pressed \
-FU§CK SHIT FUC KSHIRTA SSHIUTw\
-FU§CK SHIT FUC KSHIRTA SSHIUTw\
-FU§CK SHIT FUC KSHIRTA SSHIUTw\
-FU§CK SHIT FUC KSHIRTA SSHIUTw\
-FU§CK SHIT FUC KSHIRTA SSHIUTw\
-FU§CK SHIT FUC KSHIRTA SSHIUTw\
-FU§CK SHIT FUC KSHIRTA SSHIUTw\
-FU§CK SHIT FUC KSHIRTA SSHIUTw\
-FU§CK SHIT FUC KSHIRTA SSHIUTw\
-FU§CK SHIT FUC KSHIRTA SSHIUTw\
-"
-            );
+            panic!("Start button pressed");
         }
 
         if self.position.to_sphere().dst > self.upper_arm + self.lower_arm {
@@ -118,23 +91,22 @@ FU§CK SHIT FUC KSHIRTA SSHIUTw\
         }
     }
 
+    pub fn update_ik(&mut self) {
+        self.angles = Arm {
+            claw: self.angles.claw,
+            ..self.position.inverse_kinematics(self.upper_arm, self.lower_arm)
+        }
+
+    }
+
     pub fn update(&mut self, gamepad: &Gamepad, delta: f64) -> Result<(), ComError> {
         self.update_position(gamepad, delta);
-        self.inverse_kinematics();
+        self.update_ik();
         let data = self.angles.to_servos().to_message();
         self.connection.write(&data, true)
     }
 }
 
-impl Default for Position {
-    fn default() -> Self {
-        Self {
-            x: 0.,
-            y: 0.,
-            z: 0.,
-        }
-    }
-}
 
 /// convert servo position represented as an angle into values understod by the servo
 impl Into<u16> for Angle {

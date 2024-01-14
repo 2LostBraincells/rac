@@ -1,9 +1,23 @@
-use std::{cmp::max, f64::consts::PI};
+use std::f64::consts::PI;
 
 use crate::robot::*;
 
 use self::geometry::triangle::a_from_lengths;
 
+/// Defines a position in 3d space
+#[derive(Debug, Copy, Clone)]
+pub struct Position {
+    /// Side to side
+    pub x: f64,
+
+    /// Up and down
+    pub y: f64,
+
+    /// Forward and backward
+    pub z: f64,
+}
+
+#[derive(Debug, Copy, Clone)]
 pub struct SpherePos {
     /// Azmut angle
     pub azmut: f64,
@@ -18,27 +32,89 @@ pub struct SpherePos {
     pub f_dst: f64,
 }
 
-impl Robot {
-    pub fn inverse_kinematics(&mut self) {
-        let pos = &self.position;
-        let spos = &self.position.to_sphere();
+impl Position {
+    /// Calculates the angles for the arm to reach a position
+    ///
+    /// # Arguments
+    /// * `upper_arm` - The length of the upper Arm
+    /// * `lower_arm` - The length of the lower Arm
+    ///
+    /// # Returns
+    /// * `Arm` - The angles for the arm to reach the position
+    ///
+    /// # Examples
+    /// ```rust
+    /// use robot::kinematics::Position;
+    ///
+    /// let mut position = Position::new(0., 0., 0.);
+    ///
+    /// let arm = robot.inverse_kinematics(10,10);
+    /// ```
+    pub fn inverse_kinematics(&mut self, upper_arm: f64, lower_arm: f64) -> Arm {
+        let spos = &self.to_sphere();
 
-        let beta = a_from_lengths(self.lower_arm, self.upper_arm, spos.dst);
+        let beta = a_from_lengths(upper_arm, lower_arm, spos.dst);
 
         let alpha = {
-            let x = (spos.f_dst / pos.y).atan();
-            let y = a_from_lengths(spos.dst, self.lower_arm, self.upper_arm);
+            // arctan(f_dst / y)
+            let a = (spos.f_dst / self.y).atan();
+            let b = a_from_lengths(spos.dst, lower_arm, upper_arm);
 
-            if x + y > PI / 2. { 
-                PI - x - y
+            if a + b > PI / 2. {
+                PI - a - b
             } else {
-                x + y
+                a + b
             }
         };
 
-        self.angles.base = Angle(spos.azmut.to_degrees() + 90.);
-        self.angles.shoulder = Angle(alpha.to_degrees());
-        self.angles.elbow = Angle(beta.to_degrees());
+        Arm {
+            base: Angle(spos.azmut.to_degrees() + 90.),
+            shoulder: Angle(alpha.to_degrees()),
+            elbow: Angle(beta.to_degrees()),
+            claw: Angle(0.),
+        }
+    }
+
+    pub fn to_sphere(&self) -> SpherePos {
+        // sqrt(X^2 + Z^2)
+        let f_dst = (self.x * self.x + self.z * self.z).sqrt();
+
+        // sqrt(X^2 + Y^2 + Z^2)
+        let dst = (self.x * self.x + self.y * self.y + self.z * self.z).sqrt();
+
+        // arctan(x / z)
+        let azmut = (self.x / self.z).atan();
+
+        // arctan(f_dst / y)
+        let polar = (f_dst / self.y).atan();
+
+        SpherePos {
+            azmut,
+            polar,
+            dst,
+            f_dst,
+        }
+    }
+
+
+
+    /// Creates a new Position
+    /// # Arguments
+    /// * `x` - Side to side position
+    /// * `y` - Up and down position
+    /// * `z` - Forward and backward position
+    fn new(x: f64, y: f64, z: f64) -> Self {
+        Self { x, y, z }
+    }
+}
+
+impl Default for Position {
+    fn default() -> Self {
+        Self {
+            x: 0.,
+            y: 0.,
+            z: 0.,
+        }
     }
 }
 
@@ -46,20 +122,26 @@ impl Robot {
 mod test {
     use std::f64::consts::SQRT_2;
 
-    use crate::kinematics::Robot;
+    use crate::{
+        kinematics::Position,
+        robot::{Angle, Arm},
+    };
 
     #[test]
     fn angle_test() {
-        let mut robot = Robot::new(1., 1.);
-        robot.position.x = 0.;
-        robot.position.z = SQRT_2;
-        robot.position.y = 0.;
+        let mut position = Position::new(0., SQRT_2, 0.);
 
-        robot.inverse_kinematics();
+        let actual = position.inverse_kinematics(1., 1.);
+        let expected = Arm {
+            base: Angle(0.),
+            shoulder: Angle(45.),
+            elbow: Angle(90.),
+            claw: Angle(0.),
+        };
 
-        assert_eq!(robot.angles.base.inner().round(), 0.);
-        assert_eq!(robot.angles.shoulder.inner().round(), 45.);
-        assert_eq!(robot.angles.elbow.inner().round(), 90.);
+        assert_eq!(actual.base.inner(), expected.base.inner());
+        assert_eq!(actual.shoulder.inner(), expected.shoulder.inner());
+        assert_eq!(actual.elbow.inner(), expected.elbow.inner());
     }
 }
 
@@ -88,29 +170,6 @@ mod geometry {
                     60.00
                 );
             }
-        }
-    }
-}
-
-impl Position {
-    pub fn to_sphere(&self) -> SpherePos {
-        // sqrt(X^2 + Z^2)
-        let f_dst = (self.x * self.x + self.z * self.z).sqrt();
-
-        // sqrt(X^2 + Y^2 + Z^2)
-        let dst = (self.x * self.x + self.y * self.y + self.z * self.z).sqrt();
-
-        // arctan(x / z)
-        let azmut = (self.x / self.z).atan();
-
-        // arctan(f_dst / y)
-        let polar = (f_dst / self.y).atan();
-
-        SpherePos {
-            azmut,
-            polar,
-            dst,
-            f_dst,
         }
     }
 }
