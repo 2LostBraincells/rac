@@ -109,18 +109,34 @@ impl NoNan {
 }
 
 impl Position {
+    pub fn f_dst(&self) -> f64 {
+        (self.x * self.x + self.z * self.z).sqrt()
+    }
+
+    pub fn dst(&self) -> f64 {
+        (self.x * self.x + self.y * self.y + self.z * self.z).sqrt()
+    }
+
+    pub fn azmut(&self) -> f64 {
+        (self.x / self.z).atan()
+    }
+
+    pub fn polar(&self) -> f64 {
+        (self.f_dst() / self.y).atan()
+    }
+
     pub fn to_sphere(&self) -> SpherePos {
         // sqrt(X^2 + Z^2)
-        let f_dst = (self.x * self.x + self.z * self.z).sqrt();
+        let f_dst = self.f_dst();
 
         // sqrt(X^2 + Y^2 + Z^2)
-        let dst = (self.x * self.x + self.y * self.y + self.z * self.z).sqrt();
+        let dst = self.dst();
 
         // arctan(x / z)
-        let azmut = (self.x / self.z).atan();
+        let azmut = self.azmut();
 
         // arctan(f_dst / y)
-        let polar = (f_dst / self.y).atan();
+        let polar = self.polar();
 
         SpherePos {
             azmut: *NoNan(azmut).inner(),

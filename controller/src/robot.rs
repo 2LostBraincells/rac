@@ -23,6 +23,7 @@ pub struct Robot {
     pub lower_arm: f64,
     pub square_sum: f64,
     pub claw_open: bool,
+    pub claw_button_pressed: bool,
     pub connection: Connection,
     pub macros: Macros,
 }
@@ -74,6 +75,7 @@ impl Robot {
             lower_arm,
             square_sum: upper_arm * upper_arm + lower_arm * lower_arm,
             claw_open: false,
+            claw_button_pressed: false,
             connection: Connection::default(),
             macros: Macros::default(),
         }
@@ -101,37 +103,43 @@ impl Robot {
             self.target_position.y += y_speed;
         }
         if gamepad.is_pressed(Button::LeftTrigger2) {
-            self.claw_open = !self.claw_open;
+            if !self.claw_button_pressed {
+                self.claw_open = !self.claw_open;
+            }
+            self.claw_button_pressed = true;
+        }
+        if !gamepad.is_pressed(Button::LeftTrigger2) {
+            self.claw_button_pressed = false;
         }
 
-        // if gamepad.is_pressed(Button::North) {
-        //     if gamepad.is_pressed(Button::Select) {
-        //         self.macros.0 = self.position.clone();
-        //     } else {
-        //         self.target_position = self.macros.0.clone();
-        //     }
-        // }
-        // if gamepad.is_pressed(Button::East) {
-        //     if gamepad.is_pressed(Button::Select) {
-        //         self.macros.1 = self.position.clone();
-        //     } else {
-        //         self.target_position = self.macros.1.clone();
-        //     }
-        // }
-        // if gamepad.is_pressed(Button::South) {
-        //     if gamepad.is_pressed(Button::Select) {
-        //         self.macros.2 = self.position.clone();
-        //     } else {
-        //         self.target_position = self.macros.2.clone();
-        //     }
-        // }
-        // if gamepad.is_pressed(Button::West) {
-        //     if gamepad.is_pressed(Button::Select) {
-        //         self.macros.3 = self.position.clone();
-        //     } else {
-        //         self.target_position = self.macros.3.clone();
-        //     }
-        // }
+        if gamepad.is_pressed(Button::DPadUp) {
+            if gamepad.is_pressed(Button::Select) {
+                self.macros.0 = self.position.clone();
+            } else {
+                self.target_position = self.macros.0.clone();
+            }
+        }
+        if gamepad.is_pressed(Button::DPadRight) {
+            if gamepad.is_pressed(Button::Select) {
+                self.macros.1 = self.position.clone();
+            } else {
+                self.target_position = self.macros.1.clone();
+            }
+        }
+        if gamepad.is_pressed(Button::DPadDown) {
+            if gamepad.is_pressed(Button::Select) {
+                self.macros.2 = self.position.clone();
+            } else {
+                self.target_position = self.macros.2.clone();
+            }
+        }
+        if gamepad.is_pressed(Button::DPadLeft) {
+            if gamepad.is_pressed(Button::Select) {
+                self.macros.3 = self.position.clone();
+            } else {
+                self.target_position = self.macros.3.clone();
+            }
+        }
 
         if gamepad.is_pressed(Button::Start) {
             panic!(
@@ -150,9 +158,11 @@ FU§CK SHIT FUC KSHIRTA SSHIUTw\
             );
         }
 
-        if self.target_position.to_sphere().dst > self.upper_arm + self.lower_arm 
-            && self.target_position.to_sphere().polar < 0. 
-            && self.target_position.to_sphere().azmut{
+        if self.target_position.dst() > self.upper_arm + self.lower_arm
+            && self.target_position.polar() < 0.
+            && self.target_position.azmut() > 0.
+            && self.target_position.azmut() < 180.
+        {
             self.target_position = previous_position;
         }
     }
@@ -172,10 +182,19 @@ FU§CK SHIT FUC KSHIRTA SSHIUTw\
         };
     }
 
+    pub fn update_claw(&mut self) {
+        if self.claw_open {
+            self.angles.claw = Angle(180.);
+        } else {
+            self.angles.claw = Angle(0.);
+        }
+    }
+
     pub fn update(&mut self, gamepad: &Gamepad, delta: f64) -> Result<(), ComError> {
         self.update_controller(gamepad, delta);
         self.update_position();
         self.update_ik();
+        self.update_claw();
         let data = self.angles.to_servos().to_message();
         self.connection.write(&data, true)
     }
