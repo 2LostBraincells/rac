@@ -97,16 +97,28 @@ impl Robot {
             self.claw_open = !self.claw_open;
         }
         if gamepad.is_pressed(Button::Start) {
-            panic!("Start button pressed");
+            panic!(
+                "Start button pressed \
+FU§CK SHIT FUC KSHIRTA SSHIUTw\
+FU§CK SHIT FUC KSHIRTA SSHIUTw\
+FU§CK SHIT FUC KSHIRTA SSHIUTw\
+FU§CK SHIT FUC KSHIRTA SSHIUTw\
+FU§CK SHIT FUC KSHIRTA SSHIUTw\
+FU§CK SHIT FUC KSHIRTA SSHIUTw\
+FU§CK SHIT FUC KSHIRTA SSHIUTw\
+FU§CK SHIT FUC KSHIRTA SSHIUTw\
+FU§CK SHIT FUC KSHIRTA SSHIUTw\
+FU§CK SHIT FUC KSHIRTA SSHIUTw\
+"
+            );
         }
 
         if self.position.to_sphere().dst > self.upper_arm + self.lower_arm {
             self.position = previous_position;
         }
-
     }
 
-    pub fn update(&mut self, gamepad: &Gamepad, delta:f64) -> Result<(), ComError> {
+    pub fn update(&mut self, gamepad: &Gamepad, delta: f64) -> Result<(), ComError> {
         self.update_position(gamepad, delta);
         self.inverse_kinematics();
         let data = self.angles.to_servos().to_message();
