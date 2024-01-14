@@ -1,5 +1,5 @@
 use gilrs::{Gilrs, Button, Event};
-use crate::robot::robot::*;
+use crate::robot::*;
 
 pub struct controller {
     pub x_axis: f32,
