@@ -27,6 +27,16 @@ impl Into<u16> for Angle {
     }
 }
 
+impl Angle {
+    pub fn inner(&self) -> &f32 {
+        &self.0
+    }
+
+    pub fn inner_mut(&mut self) -> &mut f32 {
+        &mut self.0
+    }
+}
+
 /// he's average alright
 impl Default for Arm {
     fn default() -> Self {
