@@ -1,4 +1,3 @@
-use std::cmp::max;
 
 use crate::robot::*;
 use gilrs::{Axis, Button, Event, Gamepad, Gilrs};
