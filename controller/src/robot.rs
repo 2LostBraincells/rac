@@ -71,7 +71,7 @@ impl Robot {
 
         if right_stick_axis_x.abs() > DEAD_ZONE {
             self.position.z += z_speed;
-            if self.position.to_sphere().dst > self.upper_arm + self.lower_arm {
+            if self.position.to_sphere().dst > self.upper_arm + self.lower_arm || self.position.z < 0. {
                 self.position.z -= z_speed;
             }
         }
