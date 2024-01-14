@@ -2,13 +2,19 @@ use std::{cmp::max, f32::consts::PI};
 
 use crate::robot::*;
 
-
 use self::geometry::triangle::a_from_lengths;
 
 pub struct SpherePos {
+    /// Azmut angle
     pub azmut: f32,
+
+    /// Polar angle
     pub polar: f32,
+
+    /// 3d distance from origin
     pub dst: f32,
+
+    /// Distance from origin on flat ground
     pub f_dst: f32,
 }
 
@@ -34,6 +40,29 @@ impl Robot {
         self.angles.shoulder = Angle(alpha.to_degrees());
         self.angles.elbow = Angle(beta.to_degrees());
     }
+<<<<<<< HEAD
+=======
+
+    pub fn update_position(&mut self, gamepad: Gamepad) {
+        let right_stick_axis_x = gamepad.value(Axis::RightStickX);
+        let right_stick_axis_y = gamepad.value(Axis::RightStickY);
+        let left_stick_axis_x = gamepad.value(Axis::LeftStickX);
+        let left_stick_axis_y = gamepad.value(Axis::LeftStickY);
+
+        if right_stick_axis_x.abs() > DEAD_ZONE {
+            self.position.z += MAX_SPEED * right_stick_axis_x;
+        }
+        if right_stick_axis_y.abs() > DEAD_ZONE {
+            self.position.x += MAX_SPEED * right_stick_axis_y;
+        }
+        if left_stick_axis_y.abs() > DEAD_ZONE {
+            self.position.y += MAX_SPEED * left_stick_axis_x;
+        }
+        if gamepad.is_pressed(Button::LeftTrigger2) {
+            self.claw_open = !self.claw_open;
+        }
+    }
+>>>>>>> a55224d16a061e322f8e9741c1e98e72322ec906
 }
 
 #[cfg(test)]
@@ -60,6 +89,10 @@ mod test {
 mod geometry {
     pub mod triangle {
         /// The angles for the corner between a and b in radians
+        ///
+        /// x = -c^2 + a^2 + b^2
+        /// y = 2ab
+        /// arccos(x/y)
         pub fn a_from_lengths(a: f32, b: f32, c: f32) -> f32 {
             let x = -(c * c) + a * a + b * b;
             let y = 2. * a * b;
