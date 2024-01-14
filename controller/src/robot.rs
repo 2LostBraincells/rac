@@ -1,4 +1,9 @@
-use crate::{communication::{ComError, Connection}, kinematics::Position};
+use std::cmp::PartialEq;
+
+use crate::{
+    communication::{ComError, Connection},
+    kinematics::Position,
+};
 use gilrs::{Axis, Button, Gamepad};
 
 // controller constants pub const MAX_SPEED: f64 = 0.25;
@@ -94,9 +99,10 @@ impl Robot {
     pub fn update_ik(&mut self) {
         self.angles = Arm {
             claw: self.angles.claw,
-            ..self.position.inverse_kinematics(self.upper_arm, self.lower_arm)
+            ..self
+                .position
+                .inverse_kinematics(self.upper_arm, self.lower_arm)
         }
-
     }
 
     pub fn update(&mut self, gamepad: &Gamepad, delta: f64) -> Result<(), ComError> {
@@ -107,7 +113,6 @@ impl Robot {
     }
 }
 
-
 /// convert servo position represented as an angle into values understod by the servo
 impl Into<u16> for Angle {
     fn into(self) -> u16 {
@@ -116,13 +121,18 @@ impl Into<u16> for Angle {
     }
 }
 
-impl Angle {
-    pub fn inner(&self) -> &f64 {
-        &self.0
+impl PartialEq for Angle {
+    fn eq(&self, other: &Self) -> bool {
+        self.0 == other.0
     }
+}
 
-    pub fn inner_mut(&mut self) -> &mut f64 {
-        &mut self.0
+impl PartialEq for Arm {
+    fn eq(&self, other: &Self) -> bool {
+        self.base == other.base
+            && self.shoulder == other.shoulder
+            && self.elbow == other.elbow
+            && self.claw == other.claw
     }
 }
 

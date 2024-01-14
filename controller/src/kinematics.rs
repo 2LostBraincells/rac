@@ -1,8 +1,11 @@
-use std::f64::consts::PI;
+use std::{
+    f64::consts::PI,
+    ops::{Add, AddAssign, Sub, SubAssign},
+};
 
 use crate::robot::*;
 
-use self::geometry::triangle::a_from_lengths;
+use self::triangle::a_from_lengths;
 
 /// Defines a position in 3d space
 #[derive(Debug, Copy, Clone)]
@@ -46,7 +49,7 @@ impl Position {
     /// ```rust
     /// use robot::kinematics::Position;
     ///
-    /// let mut position = Position::new(0., 0., 0.);
+    /// let mut position = Position::new(1., 1., 1.);
     ///
     /// let arm = robot.inverse_kinematics(10,10);
     /// ```
@@ -96,24 +99,101 @@ impl Position {
         }
     }
 
-
-
     /// Creates a new Position
     /// # Arguments
     /// * `x` - Side to side position
     /// * `y` - Up and down position
     /// * `z` - Forward and backward position
-    fn new(x: f64, y: f64, z: f64) -> Self {
+    #[allow(dead_code)]
+    pub fn new(x: f64, y: f64, z: f64) -> Self {
         Self { x, y, z }
     }
 }
 
 impl Default for Position {
+    #[allow(dead_code)]
     fn default() -> Self {
         Self {
             x: 0.,
             y: 0.,
             z: 0.,
+        }
+    }
+}
+
+impl PartialEq for Position {
+    fn eq(&self, other: &Self) -> bool {
+        self.x == other.x && self.y == other.y && self.z == other.z
+    }
+}
+
+impl Sub for Position {
+    type Output = Self;
+
+    fn sub(self, rhs: Self) -> Self::Output {
+        Self {
+            x: self.x - rhs.x,
+            y: self.y - rhs.y,
+            z: self.z - rhs.z,
+        }
+    }
+}
+
+impl SubAssign for Position {
+    fn sub_assign(&mut self, rhs: Self) {
+        *self = Self {
+            x: self.x - rhs.x,
+            y: self.y - rhs.y,
+            z: self.z - rhs.z,
+        }
+    }
+}
+
+impl Add for Position {
+    type Output = Self;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        Self {
+            x: self.x + rhs.x,
+            y: self.y + rhs.y,
+            z: self.z + rhs.z,
+        }
+    }
+}
+
+impl AddAssign for Position {
+    fn add_assign(&mut self, rhs: Self) {
+        *self = Self {
+            x: self.x + rhs.x,
+            y: self.y + rhs.y,
+            z: self.z + rhs.z,
+        }
+    }
+}
+
+pub mod triangle {
+    /// The angles for the corner between a and b in radians
+    ///
+    /// x = -c^2 + a^2 + b^2
+    /// y = 2ab
+    /// arccos(x/y)
+    pub fn a_from_lengths(a: f64, b: f64, c: f64) -> f64 {
+        let x = -(c * c) + a * a + b * b;
+        let y = 2. * a * b;
+        (x / y).acos()
+    }
+
+    #[cfg(test)]
+    mod test {
+        use crate::kinematics::triangle;
+
+        #[test]
+        fn a_from_lengths() {
+            assert_eq!(triangle::a_from_lengths(3., 4., 5.).to_degrees(), 90.00);
+            assert_eq!(
+                triangle::a_from_lengths(2., 2., 2.).to_degrees().round(),
+                60.00
+            );
         }
     }
 }
@@ -128,48 +208,44 @@ mod test {
     };
 
     #[test]
-    fn angle_test() {
-        let mut position = Position::new(0., SQRT_2, 0.);
+    fn inverse_kinematics() {
+        let mut position = Position::new(SQRT_2, 0., 0.);
 
         let actual = position.inverse_kinematics(1., 1.);
         let expected = Arm {
-            base: Angle(0.),
+            base: Angle(180.),
             shoulder: Angle(45.),
             elbow: Angle(90.),
             claw: Angle(0.),
         };
 
-        assert_eq!(actual.base.inner(), expected.base.inner());
-        assert_eq!(actual.shoulder.inner(), expected.shoulder.inner());
-        assert_eq!(actual.elbow.inner(), expected.elbow.inner());
+        assert_eq!(actual, expected);
     }
-}
 
-mod geometry {
-    pub mod triangle {
-        /// The angles for the corner between a and b in radians
-        ///
-        /// x = -c^2 + a^2 + b^2
-        /// y = 2ab
-        /// arccos(x/y)
-        pub fn a_from_lengths(a: f64, b: f64, c: f64) -> f64 {
-            let x = -(c * c) + a * a + b * b;
-            let y = 2. * a * b;
-            (x / y).acos()
-        }
+    #[test]
+    fn addition() {
+        let a = Position::new(1., 2., 3.);
+        let mut b = Position::new(2., 2., 2.);
+        let c = Position::new(3., 2., 1.);
 
-        #[cfg(test)]
-        mod test {
-            use crate::kinematics::geometry::triangle;
+        assert_eq!(a + b, Position::new(3., 4., 5.));
+        assert_eq!(a + c, Position::new(4., 4., 4.));
 
-            #[test]
-            fn a_from_lengths() {
-                assert_eq!(triangle::a_from_lengths(3., 4., 5.).to_degrees(), 90.00);
-                assert_eq!(
-                    triangle::a_from_lengths(2., 2., 2.).to_degrees().round(),
-                    60.00
-                );
-            }
-        }
+        b += c;
+        assert_eq!(b, Position::new(5., 4., 3.));
+    }
+
+    #[test]
+    fn subtraction() {
+        let a = Position::new(1., 2., 3.);
+        let mut b = Position::new(2., 2., 2.);
+        let c = Position::new(3., 2., 1.);
+
+        assert_eq!(a - b, Position::new(-1., 0., 1.));
+        assert_eq!(a - c, Position::new(-2., 0., 2.));
+
+        b -= c;
+
+        assert_eq!(b, Position::new(-1., 0., 1.));
     }
 }
