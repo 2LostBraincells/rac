@@ -96,6 +96,9 @@ impl Robot {
         if gamepad.is_pressed(Button::LeftTrigger2) {
             self.claw_open = !self.claw_open;
         }
+        if gamepad.is_pressed(Button::Start) {
+            panic!("Start button pressed");
+        }
 
         if self.position.to_sphere().dst > self.upper_arm + self.lower_arm {
             self.position = previous_position;
