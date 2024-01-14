@@ -1,7 +1,7 @@
 use std::cmp::max;
 
 use crate::robot::*;
-use gilrs::{Button, Event, Gamepad, Gilrs, Axis};
+use gilrs::{Axis, Button, Event, Gamepad, Gilrs};
 
 const MAX_SPEED: f32 = 0.25;
 const DEAD_ZONE: f32 = 0.1;
@@ -20,9 +20,16 @@ pub struct Position {
 }
 
 pub struct SpherePos {
+    /// Azmut angle
     pub azmut: f32,
+
+    /// Polar angle
     pub polar: f32,
+
+    /// 3d distance from origin
     pub dst: f32,
+
+    /// Distance from origin on flat ground
     pub f_dst: f32,
 }
 
@@ -81,13 +88,19 @@ impl Robot {
         let left_stick_axis_x = gamepad.value(Axis::LeftStickX);
         let left_stick_axis_y = gamepad.value(Axis::LeftStickY);
 
-        if right_stick_axis_x.abs() > DEAD_ZONE { self.position.z += MAX_SPEED * right_stick_axis_x; }
-        if right_stick_axis_y.abs() > DEAD_ZONE { self.position.x += MAX_SPEED * right_stick_axis_y; }
-        if left_stick_axis_y.abs() > DEAD_ZONE { self.position.y += MAX_SPEED * left_stick_axis_x; }
-        if gamepad.is_pressed(Button::LeftTrigger2) { self.claw_open = !self.claw_open; }
+        if right_stick_axis_x.abs() > DEAD_ZONE {
+            self.position.z += MAX_SPEED * right_stick_axis_x;
+        }
+        if right_stick_axis_y.abs() > DEAD_ZONE {
+            self.position.x += MAX_SPEED * right_stick_axis_y;
+        }
+        if left_stick_axis_y.abs() > DEAD_ZONE {
+            self.position.y += MAX_SPEED * left_stick_axis_x;
+        }
+        if gamepad.is_pressed(Button::LeftTrigger2) {
+            self.claw_open = !self.claw_open;
+        }
     }
-
-    
 }
 
 #[cfg(test)]
@@ -114,6 +127,10 @@ mod test {
 mod geometry {
     pub mod triangle {
         /// The angles for the corner between a and b in radians
+        ///
+        /// x = -c^2 + a^2 + b^2
+        /// y = 2ab
+        /// arccos(x/y)
         pub fn a_from_lengths(a: f32, b: f32, c: f32) -> f32 {
             let x = -(c * c) + a * a + b * b;
             let y = 2. * a * b;
