@@ -1,9 +1,9 @@
-use crate::communication::{Connection, ComError};
-use gilrs::{Button, Gamepad, Axis};
+use crate::communication::{ComError, Connection};
+use gilrs::{Axis, Button, Gamepad};
 
-// controller constants
-pub const MAX_SPEED: f32 = 0.25;
+// controller constants pub const MAX_SPEED: f32 = 0.25;
 pub const DEAD_ZONE: f32 = 0.1;
+pub const MAX_SPEED: f32 = 0.25;
 
 // servo angles
 pub const MAX_ANGLE: f32 = 180.0;
@@ -65,11 +65,34 @@ impl Robot {
         let left_stick_axis_x = gamepad.value(Axis::LeftStickX);
         let left_stick_axis_y = gamepad.value(Axis::LeftStickY);
 
-        if right_stick_axis_x.abs() > DEAD_ZONE { self.position.z += MAX_SPEED * right_stick_axis_x; }
-        if right_stick_axis_y.abs() > DEAD_ZONE { self.position.x += MAX_SPEED * right_stick_axis_y; }
-        if left_stick_axis_y.abs() > DEAD_ZONE { self.position.y += MAX_SPEED * left_stick_axis_x; }
-        if gamepad.is_pressed(Button::LeftTrigger2) { self.claw_open = !self.claw_open; }
+        let z_speed = MAX_SPEED * right_stick_axis_x;
+        let x_speed = MAX_SPEED * right_stick_axis_y;
+        let y_speed = MAX_SPEED * left_stick_axis_x;
+
+        if right_stick_axis_x.abs() > DEAD_ZONE {
+            self.position.z += z_speed;
+            if self.position.to_sphere().dst > self.upper_arm + self.lower_arm {
+                self.position.z -= z_speed;
+            }
+        }
+        if right_stick_axis_y.abs() > DEAD_ZONE {
+            self.position.x += x_speed;
+            if self.position.to_sphere().dst > self.upper_arm + self.lower_arm {
+                self.position.z -= x_speed;
+            }
+        }
+        if left_stick_axis_y.abs() > DEAD_ZONE {
+            self.position.y += y_speed;
+            if self.position.to_sphere().dst > self.upper_arm + self.lower_arm {
+                self.position.z -= y_speed;
+            }
+        }
+        if gamepad.is_pressed(Button::LeftTrigger2) {
+            self.claw_open = !self.claw_open;
+        }
     }
+
+    /// Sends the servo positions to the arduino
     pub fn update(&mut self) -> Result<(), ComError> {
         let data = self.angles.to_servos().to_message();
         self.connection.write(&data)
@@ -79,7 +102,6 @@ impl Robot {
 /// Defines a servo angle, but with more functions on it
 #[derive(Debug, Copy, Clone)]
 pub struct Angle(pub f32);
-
 
 /// Very specific names for servos
 #[derive(Debug)]
@@ -130,7 +152,6 @@ impl Arm {
             claw: self.claw.into(),
         }
     }
-
 }
 
 /// quirky arm
