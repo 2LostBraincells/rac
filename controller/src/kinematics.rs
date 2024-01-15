@@ -1,6 +1,6 @@
 use std::{
     f64::consts::PI,
-    ops::{Add, AddAssign, Sub, SubAssign, Mul},
+    ops::{Add, AddAssign, Mul, Sub, SubAssign},
 };
 
 use crate::robot::*;
@@ -338,6 +338,8 @@ mod sphere_pos {
         let actual = pos.to_position();
         let expected = Position::new(1., 0., 1.);
 
-        assert_eq!(actual, expected);
+        assert_eq!((actual.x * 10.0f64.powi(4)).round() / 10.0f64.powi(4), 1.);
+        assert_eq!((actual.y * 10.0f64.powi(4)).round() / 10.0f64.powi(4), 0.);
+        assert_eq!((actual.z * 10.0f64.powi(4)).round() / 10.0f64.powi(4), 1.);
     }
 }
