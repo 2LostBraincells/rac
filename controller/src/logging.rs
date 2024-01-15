@@ -9,6 +9,22 @@
 /// 5 = verbose
 pub const LOG_LEVEL: u8 = 5;
 
+pub fn error(message: &'static str) {
+    if LOG_LEVEL < 1 {
+        return;
+    }
+
+    println!("ERRO: {}", message);
+}
+
+pub fn warn(message: &'static str) {
+    if LOG_LEVEL < 2 {
+        return;
+    }
+
+    println!("WARN: {}", message);
+}
+
 pub fn info(message: &'static str) {
     if LOG_LEVEL < 3 {
         return;

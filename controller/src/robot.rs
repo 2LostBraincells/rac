@@ -2,7 +2,7 @@ use std::cmp::PartialEq;
 
 use crate::{
     communication::{ComError, Connection},
-    kinematics::Position,
+    kinematics::Position, logging::warn,
 };
 use gilrs::{Axis, Button, Gamepad};
 
@@ -109,12 +109,22 @@ impl Robot {
     }
 
     pub fn update_ik(&mut self) {
-        self.angles = Arm {
-            claw: self.angles.claw,
-            ..self
-                .position
-                .inverse_kinematics(self.upper_arm, self.lower_arm)
+        let angles = self.position.inverse_kinematics(self.upper_arm, self.lower_arm);
+
+        match angles {
+
+            Ok(angles) => {
+                self.angles = Arm {
+                    claw: self.angles.claw,
+                    ..angles
+                }
+            }
+            
+            Err(()) => {
+                warn("Could not calculate inverse kinematics");
+            }
         }
+
     }
 
     pub fn update(&mut self, gamepad: &Gamepad, delta: f64) -> Result<(), ComError> {
@@ -123,6 +133,17 @@ impl Robot {
         self.update_ik();
         let data = self.angles.to_servos().to_message();
         self.connection.write(&data, true)
+    }
+}
+
+impl Angle {
+    /// If the angle is NaN, return angle where its 0, otherwise return self
+    pub fn nan_as_zero(self) -> Self {
+        if self.0.is_nan() {
+            Angle(0.)
+        } else {
+            self
+        }
     }
 }
 

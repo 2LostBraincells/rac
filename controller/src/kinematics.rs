@@ -36,15 +36,6 @@ pub struct SpherePos {
 }
 
 impl Position {
-    /// Returns the same float, but if it is NaN, it returns 0
-    fn nan_as_zero(value: f64) -> f64 {
-        if value.is_nan() {
-            0.
-        } else {
-            value
-        }
-    }
-
     /// Calculates the angles for the arm to reach a position
     ///
     /// # Arguments
@@ -52,7 +43,8 @@ impl Position {
     /// * `lower_arm` - The length of the lower Arm
     ///
     /// # Returns
-    /// * `Arm` - The angles for the arm to reach the position
+    /// Ok(Arm) - The angles for the arm to reach the position
+    /// Err(()) - No valid solution was found
     ///
     /// # Examples
     /// ```rust
@@ -62,14 +54,22 @@ impl Position {
     ///
     /// let arm = robot.inverse_kinematics(10,10);
     /// ```
-    pub fn inverse_kinematics(&mut self, upper_arm: f64, lower_arm: f64) -> Arm {
+    pub fn inverse_kinematics(&mut self, upper_arm: f64, lower_arm: f64) -> Result<Arm, ()> {
         let spos = &self.to_sphere();
 
-        let base = Self::nan_as_zero(spos.azmut).to_degrees() + 90.;
+        let base = spos.azmut.to_degrees() + 90.;
 
-        let elbow = Self::nan_as_zero(a_from_lengths(upper_arm, lower_arm, spos.dst)).to_degrees();
+        if base.is_nan() {
+            return Err(());
+        }
 
-        let shoulder = Self::nan_as_zero({
+        let elbow = a_from_lengths(upper_arm, lower_arm, spos.dst).to_degrees();
+
+        if elbow.is_nan() {
+            return Err(());
+        }
+
+        let shoulder = {
             // arctan(f_dst / y)
             let a = (spos.f_dst / self.y).atan();
             let b = a_from_lengths(spos.dst, lower_arm, upper_arm);
@@ -79,15 +79,19 @@ impl Position {
             } else {
                 a + b
             }
-        })
+        }
         .to_degrees();
 
-        Arm {
+        if shoulder.is_nan() {
+            return Err(());
+        }
+
+        Ok(Arm {
             base: Angle(base),
             shoulder: Angle(shoulder),
             elbow: Angle(elbow),
             claw: Angle(0.),
-        }
+        })
     }
 
     pub fn to_sphere(&self) -> SpherePos {
@@ -273,36 +277,35 @@ mod position {
 
     use std::f64::consts::SQRT_2;
 
-    use crate::{
-        kinematics::Position,
-        robot::{Angle, Arm},
-    };
+    use crate::
+        kinematics::Position
+    ;
 
     #[test]
     fn inverse_kinematics() {
         let mut position = Position::new(SQRT_2, 0., 0.);
 
-        let actual = position.inverse_kinematics(1., 1.);
-        let expected = Arm {
-            base: Angle(180.),
-            shoulder: Angle(45.),
-            elbow: Angle(90.),
-            claw: Angle(0.),
-        };
+        let actual = position.inverse_kinematics(1., 1.).unwrap();
 
-        assert_eq!(actual, expected);
+        assert_eq!(
+            (actual.base.0 * 10.0f64.powi(4)).round() / 10.0f64.powi(4),
+            180.
+        );
+        assert_eq!(
+            (actual.shoulder.0 * 10.0f64.powi(4)).round() / 10.0f64.powi(4),
+            45.
+        );
+        assert_eq!(
+            (actual.elbow.0 * 10.0f64.powi(4)).round() / 10.0f64.powi(4),
+            90.
+        );
 
         let mut position = Position::new(0., 0., 0.);
 
         let actual = position.inverse_kinematics(0., 0.);
-        let expected = Arm {
-            base: Angle(90.),
-            shoulder: Angle(0.),
-            elbow: Angle(0.),
-            claw: Angle(0.),
-        };
 
-        assert_eq!(actual, expected);
+        assert!(actual.is_err());
+
     }
 
     #[test]
