@@ -36,6 +36,15 @@ pub struct SpherePos {
 }
 
 impl Position {
+    /// Returns the same float, but if it is NaN, it returns 0
+    fn nan_as_zero(value: f64) -> f64 {
+        if value.is_nan() {
+            0.
+        } else {
+            value
+        }
+    }
+
     /// Calculates the angles for the arm to reach a position
     ///
     /// # Arguments
@@ -56,9 +65,11 @@ impl Position {
     pub fn inverse_kinematics(&mut self, upper_arm: f64, lower_arm: f64) -> Arm {
         let spos = &self.to_sphere();
 
-        let beta = a_from_lengths(upper_arm, lower_arm, spos.dst);
+        let base = Self::nan_as_zero(spos.azmut).to_degrees() + 90.;
 
-        let alpha = {
+        let elbow = Self::nan_as_zero(a_from_lengths(upper_arm, lower_arm, spos.dst)).to_degrees();
+
+        let shoulder = Self::nan_as_zero({
             // arctan(f_dst / y)
             let a = (spos.f_dst / self.y).atan();
             let b = a_from_lengths(spos.dst, lower_arm, upper_arm);
@@ -68,12 +79,13 @@ impl Position {
             } else {
                 a + b
             }
-        };
+        })
+        .to_degrees();
 
         Arm {
-            base: Angle(spos.azmut.to_degrees() + 90.),
-            shoulder: Angle(alpha.to_degrees()),
-            elbow: Angle(beta.to_degrees()),
+            base: Angle(base),
+            shoulder: Angle(shoulder),
+            elbow: Angle(elbow),
             claw: Angle(0.),
         }
     }
@@ -113,7 +125,7 @@ impl Position {
     ///
     /// assert_eq!(position, Position::new(0., 0., 0.));
     /// ```
-    pub fn clamp(&mut self, min: f64, max: f64) {
+    pub fn cube_clamp(&mut self, min: f64, max: f64) {
         self.x = self.x.clamp(min, max);
         self.y = self.y.clamp(min, max);
         self.z = self.z.clamp(min, max);
@@ -275,6 +287,18 @@ mod position {
             base: Angle(180.),
             shoulder: Angle(45.),
             elbow: Angle(90.),
+            claw: Angle(0.),
+        };
+
+        assert_eq!(actual, expected);
+
+        let mut position = Position::new(0., 0., 0.);
+
+        let actual = position.inverse_kinematics(0., 0.);
+        let expected = Arm {
+            base: Angle(90.),
+            shoulder: Angle(0.),
+            elbow: Angle(0.),
             claw: Angle(0.),
         };
 

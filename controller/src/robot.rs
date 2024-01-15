@@ -101,7 +101,7 @@ impl Robot {
         let mut delta_velocity = self.target_velocity - self.velocity;
 
         // limit change to acceleration
-        delta_velocity.clamp(-acceleration, acceleration);
+        delta_velocity.cube_clamp(-acceleration, acceleration);
 
         // update position and velocity
         self.velocity += delta_velocity;
