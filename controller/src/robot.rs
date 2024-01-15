@@ -1,4 +1,5 @@
 use crate::communication::{ComError, Connection};
+use crate::kinematics::Position;
 use gilrs::{Axis, Button, Gamepad};
 
 // controller constants pub const MAX_SPEED: f64 = 0.25;
@@ -34,19 +35,6 @@ pub struct Robot {
 #[derive(Debug, Copy, Clone)]
 pub struct Macros(Position, Position, Position, Position);
 
-/// Defines a position in 3d space
-#[derive(Debug, Copy, Clone, PartialEq)]
-pub struct Position {
-    /// Width
-    pub x: f64,
-
-    /// Height
-    pub y: f64,
-
-    /// Depth
-    pub z: f64,
-}
-
 /// Defines a servo angle, but with more functions on it
 #[derive(Debug, Copy, Clone)]
 pub struct Angle(pub f64);
@@ -69,6 +57,10 @@ pub struct Servos {
     pub claw: u16,
 }
 
+/// Holds whether the robot is moving or idle.
+/// If the robot is moving, it stores a value between 0.0 and 1.0 that eases the robot into the
+/// movement
+#[derive(Debug, Copy, Clone)]
 pub enum MotionState {
     Idle,
     Moving(f64),
@@ -91,10 +83,12 @@ impl Robot {
         }
     }
 
-    pub fn update_controller(&mut self, gamepad: &Gamepad, delta: f64) {
+    /// Handles input, updating the relevant values. Change this function to add controller
+    /// functionality
+    pub fn handle_input(&mut self, gamepad: &Gamepad, delta: f64) {
         let previous_position = self.target_position.clone();
 
-        let right_stick_axis_x = gamepad.value(Axis::RightStickX) as f64;
+        let _right_stick_axis_x = gamepad.value(Axis::RightStickX) as f64;
         let right_stick_axis_y = gamepad.value(Axis::RightStickY) as f64;
         let left_stick_axis_x = gamepad.value(Axis::LeftStickX) as f64;
         let left_stick_axis_y = gamepad.value(Axis::LeftStickY) as f64;
@@ -151,21 +145,8 @@ impl Robot {
             }
         }
 
-        if gamepad.is_pressed(Button::Start) {
-            panic!(
-                "Start button pressed \
-FU§CK SHIT FUC KSHIRTA SSHIUTw\
-FU§CK SHIT FUC KSHIRTA SSHIUTw\
-FU§CK SHIT FUC KSHIRTA SSHIUTw\
-FU§CK SHIT FUC KSHIRTA SSHIUTw\
-FU§CK SHIT FUC KSHIRTA SSHIUTw\
-FU§CK SHIT FUC KSHIRTA SSHIUTw\
-FU§CK SHIT FUC KSHIRTA SSHIUTw\
-FU§CK SHIT FUC KSHIRTA SSHIUTw\
-FU§CK SHIT FUC KSHIRTA SSHIUTw\
-FU§CK SHIT FUC KSHIRTA SSHIUTw\
-"
-            );
+        if gamepad.is_pressed(Button::Mode) {
+            panic!("Xbox button pressed, theres no way to recover from this");
         }
 
         if self.target_position.dst() > self.upper_arm + self.lower_arm
@@ -177,15 +158,17 @@ FU§CK SHIT FUC KSHIRTA SSHIUTw\
         }
     }
 
+    /// Moves the arms current position in the direction if the target position
     pub fn update_position(&mut self) {
         let mut delta_sphere = (self.target_position - self.position).to_sphere();
         delta_sphere.dst =
             (MAX_TRAVEL_SPEED * self.motion_state.shape(|x| x.sqrt())).min(delta_sphere.dst);
         self.position += delta_sphere.to_position();
 
-        self.motion_state.ease_in();
+        self.motion_state.ease_in(MOTION_EASE_IN);
     }
 
+    /// Runs the inverse kinematics on the position and updates the arm
     pub fn update_ik(&mut self) {
         self.angles = Arm {
             claw: self.angles.claw,
@@ -195,6 +178,7 @@ FU§CK SHIT FUC KSHIRTA SSHIUTw\
         };
     }
 
+    /// Changes claw servo depending on if the claw is supposed to be open or not
     pub fn update_claw(&mut self) {
         if self.claw_open {
             self.angles.claw = Angle(180.);
@@ -203,16 +187,18 @@ FU§CK SHIT FUC KSHIRTA SSHIUTw\
         }
     }
 
+    /// The stripped down update loop
     pub fn idle_update(&mut self, gamepad: &Gamepad, delta: f64) {
-        self.update_controller(gamepad, delta);
+        self.handle_input(gamepad, delta);
 
         if self.position != self.target_position {
             self.motion_state = MotionState::Moving(0.);
         }
     }
 
+    /// The standard movement update loop
     pub fn moving_update(&mut self, gamepad: &Gamepad, delta: f64) {
-        self.update_controller(gamepad, delta);
+        self.handle_input(gamepad, delta);
         self.update_position();
         self.update_ik();
         self.update_claw();
@@ -222,6 +208,7 @@ FU§CK SHIT FUC KSHIRTA SSHIUTw\
         }
     }
 
+    /// Runs all of the necessary function in order to update controller and move the robot
     pub fn update(&mut self, gamepad: &Gamepad, delta: f64) -> Result<(), ComError> {
         match self.motion_state {
             MotionState::Idle => {
@@ -239,38 +226,44 @@ FU§CK SHIT FUC KSHIRTA SSHIUTw\
 
 #[allow(unused)]
 impl MotionState {
+    /// If the current state holds a value, returns a reference to that value
     pub fn inner(&self) -> Option<&f64> {
         match self {
             MotionState::Moving(x) => Some(x),
             MotionState::Idle => None,
         }
     }
+    /// If the current state holds a value, returns a mutable reference to that value
     pub fn inner_mut(&mut self) -> Option<&mut f64> {
         match self {
             MotionState::Moving(x) => Some(x),
             MotionState::Idle => None,
         }
     }
-    pub fn ease_in(&mut self) {
+    /// If the state is moving, its value will linearly approach 1.0
+    pub fn ease_in(&mut self, amount: f64) {
         match self {
-            MotionState::Moving(x) => *x += MOTION_EASE_IN,
+            MotionState::Moving(x) => *x = amount.min(1.),
             _ => {}
         }
     }
+
+    /// If the state is moving, returns a value based on an input shaping function
+    ///
+    ///# Example
+    ///
+    /// ```
+    /// let motion = MotionState::Moving(0.5);
+    ///
+    /// let shaping_function = |x| x.sqrt()
+    ///
+    /// assert_eq(motion.shape(shaping_function), 0.5.sqrt())
+    /// assert_eq(motion.shape(|x| x.sqrt()), 0.5.sqrt())
+    /// ```
     pub fn shape(&self, function: impl Fn(f64) -> f64) -> f64 {
         match self {
             MotionState::Moving(x) => function(*x),
             _ => 0.,
-        }
-    }
-}
-
-impl Default for Position {
-    fn default() -> Self {
-        Self {
-            x: 0.,
-            y: 0.,
-            z: 0.,
         }
     }
 }
@@ -294,6 +287,7 @@ impl Into<u16> for Angle {
     }
 }
 
+#[allow(unused)]
 impl Angle {
     pub fn inner(&self) -> &f64 {
         &self.0

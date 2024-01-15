@@ -19,17 +19,11 @@ typedef struct Command {
 const short MAX = 2400; //2400
 const short MIN = 250; //250
 
-int parse_size = 0;
-byte *byte_buffer;
-
 Command message = {
     MAX, MAX, MAX, MAX 
 };
 
 void setup() {
-    parse_size = 4 * sizeof(short);
-    byte_buffer = malloc(parse_size);
-
     base.attach(BASE_PIN);
     shoulder.attach(SHOULDER_PIN);
     elbow.attach(ELBOW_PIN);

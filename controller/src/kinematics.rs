@@ -4,6 +4,19 @@ use crate::robot::*;
 
 use self::geometry::triangle::a_from_lengths;
 
+/// Defines a position in 3d space
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub struct Position {
+    /// Width
+    pub x: f64,
+
+    /// Height
+    pub y: f64,
+
+    /// Depth
+    pub z: f64,
+}
+
 #[derive(Debug, Clone, Copy)]
 pub struct SpherePos {
     /// Azmut angle
@@ -108,6 +121,16 @@ impl NoNan {
     }
 }
 
+impl Default for Position {
+    fn default() -> Self {
+        Self {
+            x: 0.,
+            y: 0.,
+            z: 0.,
+        }
+    }
+}
+
 impl Position {
     pub fn f_dst(&self) -> f64 {
         (self.x * self.x + self.z * self.z).sqrt()
@@ -131,7 +154,7 @@ impl Position {
 
         // sqrt(X^2 + Y^2 + Z^2)
         let dst = self.dst();
-
+        
         // arctan(x / z)
         let azmut = self.azmut();
 
