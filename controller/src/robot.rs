@@ -5,6 +5,7 @@ use gilrs::{Axis, Button, Gamepad};
 pub const DEAD_ZONE: f64 = 0.2;
 pub const MAX_SPEED: f64 = 10.;
 pub const MAX_TRAVEL_SPEED: f64 = 10.;
+pub const MOTION_EASE_IN: f64 = 0.05;
 
 // servo angles
 pub const MAX_ANGLE: f64 = 180.0;
@@ -16,6 +17,7 @@ pub const MIN_SERVO: u16 = 250;
 
 /// Defines a robot and its physical properties
 pub struct Robot {
+    pub motion_state: MotionState,
     pub position: Position,
     pub target_position: Position,
     pub angles: Arm,
@@ -28,10 +30,12 @@ pub struct Robot {
     pub macros: Macros,
 }
 
+/// Defines a collection of macros
+#[derive(Debug, Copy, Clone)]
 pub struct Macros(Position, Position, Position, Position);
 
 /// Defines a position in 3d space
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub struct Position {
     /// Width
     pub x: f64,
@@ -65,9 +69,15 @@ pub struct Servos {
     pub claw: u16,
 }
 
+pub enum MotionState {
+    Idle,
+    Moving(f64),
+}
+
 impl Robot {
     pub fn new(lower_arm: f64, upper_arm: f64) -> Robot {
         Robot {
+            motion_state: MotionState::Idle,
             position: Position::default(),
             target_position: Position::default(),
             angles: Arm::default(),
@@ -169,8 +179,11 @@ FU§CK SHIT FUC KSHIRTA SSHIUTw\
 
     pub fn update_position(&mut self) {
         let mut delta_sphere = (self.target_position - self.position).to_sphere();
-        delta_sphere.dst = MAX_TRAVEL_SPEED.min(delta_sphere.dst);
+        delta_sphere.dst =
+            (MAX_TRAVEL_SPEED * self.motion_state.shape(|x| x.sqrt())).min(delta_sphere.dst);
         self.position += delta_sphere.to_position();
+
+        self.motion_state.ease_in();
     }
 
     pub fn update_ik(&mut self) {
@@ -190,13 +203,65 @@ FU§CK SHIT FUC KSHIRTA SSHIUTw\
         }
     }
 
-    pub fn update(&mut self, gamepad: &Gamepad, delta: f64) -> Result<(), ComError> {
+    pub fn idle_update(&mut self, gamepad: &Gamepad, delta: f64) {
+        self.update_controller(gamepad, delta);
+
+        if self.position != self.target_position {
+            self.motion_state = MotionState::Moving(0.);
+        }
+    }
+
+    pub fn moving_update(&mut self, gamepad: &Gamepad, delta: f64) {
         self.update_controller(gamepad, delta);
         self.update_position();
         self.update_ik();
         self.update_claw();
+
+        if self.position == self.target_position {
+            self.motion_state = MotionState::Idle;
+        }
+    }
+
+    pub fn update(&mut self, gamepad: &Gamepad, delta: f64) -> Result<(), ComError> {
+        match self.motion_state {
+            MotionState::Idle => {
+                self.idle_update(gamepad, delta);
+            }
+            MotionState::Moving(_) => {
+                self.moving_update(gamepad, delta);
+            }
+        }
+
         let data = self.angles.to_servos().to_message();
         self.connection.write(&data, true)
+    }
+}
+
+#[allow(unused)]
+impl MotionState {
+    pub fn inner(&self) -> Option<&f64> {
+        match self {
+            MotionState::Moving(x) => Some(x),
+            MotionState::Idle => None,
+        }
+    }
+    pub fn inner_mut(&mut self) -> Option<&mut f64> {
+        match self {
+            MotionState::Moving(x) => Some(x),
+            MotionState::Idle => None,
+        }
+    }
+    pub fn ease_in(&mut self) {
+        match self {
+            MotionState::Moving(x) => *x += MOTION_EASE_IN,
+            _ => {}
+        }
+    }
+    pub fn shape(&self, function: impl Fn(f64) -> f64) -> f64 {
+        match self {
+            MotionState::Moving(x) => function(*x),
+            _ => 0.,
+        }
     }
 }
 
