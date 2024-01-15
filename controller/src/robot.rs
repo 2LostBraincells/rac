@@ -6,10 +6,6 @@ use crate::{
 };
 use gilrs::{Axis, Button, Gamepad};
 
-// controller constants pub const MAX_SPEED: f64 = 0.25;
-pub const DEAD_ZONE: f64 = 0.2;
-pub const MAX_SPEED: f64 = 10.;
-
 // servo angles
 pub const MAX_ANGLE: f64 = 180.0;
 pub const MIN_ANGLE: f64 = 0.0;
