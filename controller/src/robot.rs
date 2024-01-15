@@ -21,6 +21,16 @@ pub const MIN_SERVO: u16 = 250;
 /// Defines a robot and its physical properties
 pub struct Robot {
     pub position: Position,
+    pub target_position: Option<Position>,
+
+    // as a velocity vector
+    pub velocity: Position,
+    pub max_velocity: Position,
+    pub target_velocity: Position,
+
+    // maximum change in velocity per second
+    pub acceleration: f64,
+
     pub angles: Arm,
     pub upper_arm: f64,
     pub lower_arm: f64,
@@ -55,6 +65,11 @@ impl Robot {
     pub fn new(lower_arm: f64, upper_arm: f64) -> Robot {
         Robot {
             position: Position::default(),
+            target_position: None,
+            velocity: Position::default(),
+            max_velocity: Position::default(),
+            target_velocity: Position::default(),
+            acceleration: 1.,
             angles: Arm::default(),
             upper_arm,
             lower_arm,
@@ -64,36 +79,33 @@ impl Robot {
         }
     }
 
-    pub fn update_position(&mut self, gamepad: &Gamepad, delta: f64) {
-        let previous_position = self.position.clone();
-
+    pub fn update_gamepad(&mut self, gamepad: &Gamepad) {
         let right_stick_axis_y = gamepad.value(Axis::RightStickY) as f64;
         let left_stick_axis_x = gamepad.value(Axis::LeftStickX) as f64;
         let left_stick_axis_y = gamepad.value(Axis::LeftStickY) as f64;
 
-        let z_speed = MAX_SPEED * delta * left_stick_axis_y;
-        let x_speed = MAX_SPEED * delta * left_stick_axis_x;
-        let y_speed = MAX_SPEED * delta * right_stick_axis_y;
+        self.target_velocity.z = self.max_velocity.z * left_stick_axis_y;
+        self.target_velocity.x = self.max_velocity.x * left_stick_axis_x;
+        self.target_velocity.y = self.max_velocity.y * right_stick_axis_y;
 
-        if left_stick_axis_y.abs() > DEAD_ZONE {
-            self.position.z += z_speed;
-        }
-        if left_stick_axis_x.abs() > DEAD_ZONE {
-            self.position.x += x_speed;
-        }
-        if right_stick_axis_y.abs() > DEAD_ZONE {
-            self.position.y += y_speed;
-        }
-        if gamepad.is_pressed(Button::LeftTrigger2) {
-            self.claw_open = !self.claw_open;
-        }
         if gamepad.is_pressed(Button::Start) {
             panic!("Start button pressed");
         }
+    }
 
-        if self.position.to_sphere().dst > self.upper_arm + self.lower_arm {
-            self.position = previous_position;
-        }
+    pub fn update_position(&mut self, delta: f64) {
+        // actual acceleration for this update step
+        let acceleration = self.acceleration * delta;
+
+        // the changle in velocity we need
+        let mut delta_velocity = self.target_velocity - self.velocity;
+
+        // limit change to acceleration
+        delta_velocity.clamp(-acceleration, acceleration);
+
+        // update position and velocity
+        self.velocity += delta_velocity;
+        self.position += self.velocity * delta;
     }
 
     pub fn update_ik(&mut self) {
@@ -106,7 +118,8 @@ impl Robot {
     }
 
     pub fn update(&mut self, gamepad: &Gamepad, delta: f64) -> Result<(), ComError> {
-        self.update_position(gamepad, delta);
+        self.update_gamepad(gamepad);
+        self.update_position(delta);
         self.update_ik();
         let data = self.angles.to_servos().to_message();
         self.connection.write(&data, true)

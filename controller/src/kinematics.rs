@@ -1,6 +1,6 @@
 use std::{
     f64::consts::PI,
-    ops::{Add, AddAssign, Sub, SubAssign},
+    ops::{Add, AddAssign, Sub, SubAssign, Mul},
 };
 
 use crate::robot::*;
@@ -99,12 +99,31 @@ impl Position {
         }
     }
 
+    /// Clamp all the values in the position to a range
+    ///
+    /// # Arguments
+    /// * `min` - The minimum value for the position
+    /// * `max` - The maximum value for the position
+    ///
+    /// # Examples
+    /// ```rust
+    /// use robot::kinematics::Position;
+    /// let mut position = Position::new(1., 1., 1.);
+    /// position.clamp(0., 0.);
+    ///
+    /// assert_eq!(position, Position::new(0., 0., 0.));
+    /// ```
+    pub fn clamp(&mut self, min: f64, max: f64) {
+        self.x = self.x.clamp(min, max);
+        self.y = self.y.clamp(min, max);
+        self.z = self.z.clamp(min, max);
+    }
+
     /// Creates a new Position
     /// # Arguments
     /// * `x` - Side to side position
     /// * `y` - Up and down position
     /// * `z` - Forward and backward position
-    #[allow(dead_code)]
     pub fn new(x: f64, y: f64, z: f64) -> Self {
         Self { x, y, z }
     }
@@ -121,13 +140,16 @@ impl Default for Position {
     }
 }
 
+impl Eq for Position {}
 impl PartialEq for Position {
     fn eq(&self, other: &Self) -> bool {
         self.x == other.x && self.y == other.y && self.z == other.z
     }
-}
 
-impl Eq for Position {}
+    fn ne(&self, other: &Self) -> bool {
+        self.x != other.x || self.y != other.y || self.z != other.z
+    }
+}
 
 impl Sub for Position {
     type Output = Self;
@@ -169,6 +191,30 @@ impl AddAssign for Position {
             x: self.x + rhs.x,
             y: self.y + rhs.y,
             z: self.z + rhs.z,
+        }
+    }
+}
+
+impl Mul<Position> for Position {
+    type Output = Self;
+
+    fn mul(self, rhs: Self) -> Self::Output {
+        Self {
+            x: self.x * rhs.x,
+            y: self.y * rhs.y,
+            z: self.z * rhs.z,
+        }
+    }
+}
+
+impl Mul<f64> for Position {
+    type Output = Self;
+
+    fn mul(self, rhs: f64) -> Self::Output {
+        Self {
+            x: self.x * rhs,
+            y: self.y * rhs,
+            z: self.z * rhs,
         }
     }
 }
@@ -265,8 +311,8 @@ mod position {
 
 #[cfg(test)]
 mod sphere_pos {
-    use std::f64::consts::{SQRT_2, PI};
     use crate::kinematics::{Position, SpherePos};
+    use std::f64::consts::{PI, SQRT_2};
 
     #[test]
     fn to_position() {
