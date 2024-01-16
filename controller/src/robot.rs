@@ -1,8 +1,8 @@
-use std::cmp::PartialEq;
+use std::{cmp::PartialEq, fmt::Debug};
 
 use crate::{
     communication::{ComError, Connection},
-    kinematics::Position,
+    kinematics::{Position, Joint, Motion},
     logging::warn,
 };
 use gilrs::{Axis, Button, Gamepad};
@@ -16,6 +16,7 @@ pub const MAX_SERVO: u16 = 2400;
 pub const MIN_SERVO: u16 = 250;
 
 /// Defines a robot and its physical properties
+#[derive(Debug)]
 pub struct Robot {
     pub position: Position,
     pub target_position: Option<Position>,
@@ -36,17 +37,15 @@ pub struct Robot {
     pub connection: Connection,
 }
 
-/// Defines a servo angle, but with more functions on it
-#[derive(Debug, Copy, Clone)]
-pub struct Angle(pub f64);
+
 
 /// Very specific names for servos
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug)]
 pub struct Arm {
-    pub base: Angle,
-    pub shoulder: Angle,
-    pub elbow: Angle,
-    pub claw: Angle,
+    pub base: Joint,
+    pub shoulder: Joint,
+    pub elbow: Joint,
+    pub claw: Joint,
 }
 
 /// quirky arm
@@ -81,7 +80,6 @@ impl Robot {
         let left_stick_axis_x = gamepad.value(Axis::LeftStickX) as f64;
         let left_stick_axis_y = gamepad.value(Axis::LeftStickY) as f64;
 
-        gamepad.value(100);
         self.target_velocity.z = self.max_velocity.z * left_stick_axis_y;
         self.target_velocity.x = self.max_velocity.x * left_stick_axis_x;
         self.target_velocity.y = self.max_velocity.y * right_stick_axis_y;
@@ -122,11 +120,10 @@ impl Robot {
 
         match angles {
             Ok(angles) => {
-                self.angles = Arm {
-                    claw: self.angles.claw,
-                    ..angles
+                    self.angles.base.angle = angles.0;
+                    self.angles.shoulder.angle = angles.1;
+                    self.angles.elbow.angle = angles.2;
                 }
-            }
 
             Err(()) => {
                 warn("Could not calculate inverse kinematics");
@@ -143,29 +140,18 @@ impl Robot {
     }
 }
 
-impl Angle {
-    /// If the angle is NaN, return angle where its 0, otherwise return self
-    pub fn nan_as_zero(self) -> Self {
-        if self.0.is_nan() {
-            Angle(0.)
-        } else {
-            self
-        }
-    }
-}
-
 /// convert servo position represented as an angle into values understod by the servo
-impl Into<u16> for Angle {
-    fn into(self) -> u16 {
-        let factor = (self.0 - MIN_ANGLE) / MAX_ANGLE;
+impl Joint {
+    fn into_servo(&self) -> u16 {
+        let factor = (self.motion.get_pivot_angle(self.angle) - MIN_ANGLE) / MAX_ANGLE;
         ((MAX_SERVO - MIN_SERVO) as f64 * factor + MIN_SERVO as f64) as u16
     }
 }
 
-impl PartialEq for Angle {
+impl PartialEq for Joint {
     fn eq(&self, other: &Self) -> bool {
-        let left = (self.0 * 10.0f64.powi(4)).round() / 10.0f64.powi(4);
-        let right = (other.0 * 10.0f64.powi(4)).round() / 10.0f64.powi(4);
+        let left = (self.angle * 10.0f64.powi(4)).round() / 10.0f64.powi(4);
+        let right = (other.angle * 10.0f64.powi(4)).round() / 10.0f64.powi(4);
         left == right
     }
 }
@@ -183,10 +169,10 @@ impl PartialEq for Arm {
 impl Default for Arm {
     fn default() -> Self {
         Self {
-            base: Angle(0.),
-            shoulder: Angle(0.),
-            elbow: Angle(0.),
-            claw: Angle(0.),
+            base: Joint::default(),
+            shoulder: Joint::default(),
+            elbow: Joint::default(),
+            claw: Joint::default(),
         }
     }
 }
@@ -195,10 +181,10 @@ impl Default for Arm {
 impl Arm {
     pub fn to_servos(&self) -> Servos {
         Servos {
-            base: self.base.into(),
-            shoulder: self.shoulder.into(),
-            elbow: self.elbow.into(),
-            claw: self.claw.into(),
+            base: self.base.into_servo(),
+            shoulder: self.shoulder.into_servo(),
+            elbow: self.elbow.into_servo(),
+            claw: self.claw.into_servo(),
         }
     }
 }

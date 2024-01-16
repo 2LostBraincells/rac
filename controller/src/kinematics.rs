@@ -3,7 +3,7 @@ use std::{
     ops::{Add, AddAssign, Mul, Sub, SubAssign},
 };
 
-use crate::robot::*;
+use std::fmt::Debug;
 
 use self::triangle::a_from_lengths;
 
@@ -35,6 +35,44 @@ pub struct SpherePos {
     pub f_dst: f64,
 }
 
+/// A arm joint with limits and functions for calculating pivot angle
+#[derive(Debug)]
+pub struct Joint {
+    pub angle: f64,
+    pub min: f64,
+    pub max: f64,
+    pub motion: MotionField,
+}
+
+/// Type association for Motion trait that implements debug
+pub type MotionField = Box<dyn Motion>;
+
+pub struct DoubleLinkage {
+    /// Distance from the pivot to the connection point
+    pub connection_radial_offset: f64,
+
+    /// distance from the centerline of the arm to the connection point
+    pub connection_linear_offset: f64,
+
+    /// how far behind the controlled pivot is from the arm pivot
+    pub controll_pivot_horizontal_offset: f64,
+    /// how far above the controlled pivot is from the arm pivot
+    pub controll_pivot_vertical_offset: f64,
+
+    /// Length or rod connected to controller pivot
+    pub controller_pivot_rod_length: f64,
+
+    /// Length of rod connecting `controller_pivot_rod_length` to connection
+    pub connection_rod_length: f64,
+}
+
+pub struct DirectDrive {}
+
+/// Trait for join motion
+pub trait Motion {
+    fn get_pivot_angle(&self, target: f64) -> f64;
+}
+
 impl Position {
     /// Calculates the angles for the arm to reach a position
     ///
@@ -54,7 +92,11 @@ impl Position {
     ///
     /// let arm = robot.inverse_kinematics(10,10);
     /// ```
-    pub fn inverse_kinematics(&mut self, upper_arm: f64, lower_arm: f64) -> Result<Arm, ()> {
+    pub fn inverse_kinematics(
+        &mut self,
+        upper_arm: f64,
+        lower_arm: f64,
+    ) -> Result<(f64, f64, f64), ()> {
         let spos = &self.to_sphere();
 
         let base = spos.azmut.to_degrees() + 90.;
@@ -86,12 +128,7 @@ impl Position {
             return Err(());
         }
 
-        Ok(Arm {
-            base: Angle(base),
-            shoulder: Angle(shoulder),
-            elbow: Angle(elbow),
-            claw: Angle(0.),
-        })
+        Ok((base, shoulder, elbow))
     }
 
     pub fn to_sphere(&self) -> SpherePos {
@@ -142,6 +179,187 @@ impl Position {
     /// * `z` - Forward and backward position
     pub fn new(x: f64, y: f64, z: f64) -> Self {
         Self { x, y, z }
+    }
+}
+
+impl DirectDrive {
+    pub fn new() -> DirectDrive {
+        DirectDrive {}
+    }
+}
+
+impl DoubleLinkage {
+    pub fn new(
+        connection_radial_offset: f64,
+        connection_linear_offset: f64,
+        controll_pivot_horizontal_offset: f64,
+        controll_pivot_vertical_offset: f64,
+        controller_pivot_rod_length: f64,
+        connection_rod_length: f64,
+    ) -> Self {
+        Self {
+            connection_radial_offset,
+            connection_linear_offset,
+            controll_pivot_horizontal_offset,
+            controll_pivot_vertical_offset,
+            controller_pivot_rod_length,
+            connection_rod_length,
+        }
+    }
+
+    /// Calculate the angle and distance between the arm pivot and the arm connection point
+    ///
+    /// # Returns
+    /// (angle, distance)
+    /// angle in radians
+    ///
+    /// # Examples
+    /// ```rust
+    /// use robot::kinematics::DoubleLinkage;
+    /// let linkage = DoubleLinkage::new(1., 1., 1., 1., 1., 1.);
+    /// let (angle, distance) = linkage.connection_offset();
+    /// ```
+    pub fn connection_offset(&self) -> (f64, f64) {
+        let angle = (self.connection_radial_offset / self.connection_linear_offset).atan();
+        let distance =
+            (self.connection_radial_offset.powi(2) + self.connection_linear_offset.powi(2)).sqrt();
+
+        (angle, distance)
+    }
+
+    /// Calculate the angle and distance between the arm pivot and the arm connection point
+    ///
+    /// # Returns
+    /// (angle, distance)
+    /// angle in radians
+    ///
+    /// # Examples
+    /// ```rust
+    /// use robot::kinematics::DoubleLinkage;
+    ///
+    /// let linkage = DoubleLinkage::new(1., 1., 1., 1., 1., 1.);
+    /// let (angle, distance) = linkage.controller_offset();
+    /// ```
+    pub fn controller_offset(&self) -> (f64, f64) {
+        let angle =
+            (self.controll_pivot_horizontal_offset / self.controll_pivot_vertical_offset).atan();
+        let distance = (self.controll_pivot_horizontal_offset.powi(2)
+            + self.controll_pivot_vertical_offset.powi(2))
+        .sqrt();
+
+        (angle, distance)
+    }
+}
+
+impl Motion for DirectDrive {
+    fn get_pivot_angle(&self, target: f64) -> f64 {
+        target
+    }
+}
+
+impl Motion for DoubleLinkage {
+    fn get_pivot_angle(&self, target: f64) -> f64 {
+        let connection = self.connection_offset();
+        let controller = self.controller_offset();
+
+        let inner_target_angle = PI - target - connection.0;
+
+        let connection_to_controller = triangle::length_from_two_lengths_and_angle(
+            inner_target_angle,
+            connection.1,
+            controller.1,
+        );
+
+        let angle = {
+            let x = triangle::a_from_lengths(
+                connection_to_controller,
+                self.controller_pivot_rod_length,
+                self.connection_rod_length,
+            );
+
+            let y = triangle::a_from_lengths(
+                connection_to_controller,
+                controller.1,
+                connection.1,
+            );
+
+            x+y
+        };
+
+
+        angle.to_degrees()
+    }
+}
+
+pub mod triangle {
+    /// The angle for the corner between a and b in radians
+    ///
+    /// x = -c^2 + a^2 + b^2
+    /// y = 2ab
+    ///
+    /// arccos(x/y)
+    pub fn a_from_lengths(a: f64, b: f64, c: f64) -> f64 {
+        let x = -(c * c) + a * a + b * b;
+        let y = 2. * a * b;
+        (x / y).acos()
+    }
+
+    /// The length of the side opposite of the angle
+    ///
+    /// x = a - cos(angle) * a
+    /// y = sin(angle) * b
+    ///
+    /// sqrt(x^2 + y^2)
+    pub fn length_from_two_lengths_and_angle(angle: f64, a: f64, b: f64) -> f64 {
+        let x = a - angle.cos() * a;
+        let y = angle.sin() * b;
+
+        (x * x + y * y).sqrt()
+    }
+
+    #[cfg(test)]
+    mod test {
+        use crate::kinematics::triangle;
+
+        #[test]
+        fn a_from_lengths() {
+            assert_eq!(triangle::a_from_lengths(3., 4., 5.).to_degrees(), 90.00);
+            assert_eq!(
+                triangle::a_from_lengths(2., 2., 2.).to_degrees().round(),
+                60.00
+            );
+        }
+
+        #[test]
+        fn length_from_two_lengths_and_angle() {
+            assert_eq!(
+                triangle::length_from_two_lengths_and_angle(90f64.to_radians(), 3., 4.).round(),
+                5.
+            );
+            assert_eq!(
+                triangle::length_from_two_lengths_and_angle(60f64.to_radians(), 2., 2.).round(),
+                2.
+            );
+        }
+    }
+}
+
+impl Debug for MotionField {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("MotionField")
+            .field("moption", &self.get_pivot_angle(0.))
+            .finish()
+    }
+}
+
+impl Default for Joint {
+    fn default() -> Self {
+        Self {
+            angle: 0.,
+            min: 0.,
+            max: 180.,
+            motion: Box::new(DirectDrive::new()),
+        }
     }
 }
 
@@ -245,41 +463,12 @@ impl SpherePos {
     }
 }
 
-pub mod triangle {
-    /// The angles for the corner between a and b in radians
-    ///
-    /// x = -c^2 + a^2 + b^2
-    /// y = 2ab
-    /// arccos(x/y)
-    pub fn a_from_lengths(a: f64, b: f64, c: f64) -> f64 {
-        let x = -(c * c) + a * a + b * b;
-        let y = 2. * a * b;
-        (x / y).acos()
-    }
-
-    #[cfg(test)]
-    mod test {
-        use crate::kinematics::triangle;
-
-        #[test]
-        fn a_from_lengths() {
-            assert_eq!(triangle::a_from_lengths(3., 4., 5.).to_degrees(), 90.00);
-            assert_eq!(
-                triangle::a_from_lengths(2., 2., 2.).to_degrees().round(),
-                60.00
-            );
-        }
-    }
-}
-
 #[cfg(test)]
 mod position {
 
     use std::f64::consts::SQRT_2;
 
-    use crate::
-        kinematics::Position
-    ;
+    use crate::kinematics::Position;
 
     #[test]
     fn inverse_kinematics() {
@@ -287,25 +476,15 @@ mod position {
 
         let actual = position.inverse_kinematics(1., 1.).unwrap();
 
-        assert_eq!(
-            (actual.base.0 * 10.0f64.powi(4)).round() / 10.0f64.powi(4),
-            180.
-        );
-        assert_eq!(
-            (actual.shoulder.0 * 10.0f64.powi(4)).round() / 10.0f64.powi(4),
-            45.
-        );
-        assert_eq!(
-            (actual.elbow.0 * 10.0f64.powi(4)).round() / 10.0f64.powi(4),
-            90.
-        );
+        assert_eq!((actual.0 * 10.0f64.powi(4)).round() / 10.0f64.powi(4), 180.);
+        assert_eq!((actual.1 * 10.0f64.powi(4)).round() / 10.0f64.powi(4), 45.);
+        assert_eq!((actual.2 * 10.0f64.powi(4)).round() / 10.0f64.powi(4), 90.);
 
         let mut position = Position::new(0., 0., 0.);
 
         let actual = position.inverse_kinematics(0., 0.);
 
         assert!(actual.is_err());
-
     }
 
     #[test]
