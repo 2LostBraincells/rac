@@ -2,7 +2,8 @@ use std::cmp::PartialEq;
 
 use crate::{
     communication::{ComError, Connection},
-    kinematics::Position, logging::warn,
+    kinematics::Position,
+    logging::warn,
 };
 use gilrs::{Axis, Button, Gamepad};
 
@@ -80,6 +81,7 @@ impl Robot {
         let left_stick_axis_x = gamepad.value(Axis::LeftStickX) as f64;
         let left_stick_axis_y = gamepad.value(Axis::LeftStickY) as f64;
 
+        gamepad.value(100);
         self.target_velocity.z = self.max_velocity.z * left_stick_axis_y;
         self.target_velocity.x = self.max_velocity.x * left_stick_axis_x;
         self.target_velocity.y = self.max_velocity.y * right_stick_axis_y;
@@ -96,31 +98,40 @@ impl Robot {
         // the changle in velocity we need
         let mut delta_velocity = self.target_velocity - self.velocity;
 
-        // limit change to acceleration
+        // limit change to maximum acceleration
         delta_velocity.cube_clamp(-acceleration, acceleration);
 
         // update position and velocity
         self.velocity += delta_velocity;
         self.position += self.velocity * delta;
+
+        // limit position to not be outside of the range of motion
+        let mut sphere = self.position.to_sphere();
+
+        // clamp distance from origin
+        sphere.dst = sphere.dst.min(self.upper_arm + self.lower_arm);
+
+        // convert back to 3d cordinates and apply new position
+        self.position = sphere.to_position();
     }
 
     pub fn update_ik(&mut self) {
-        let angles = self.position.inverse_kinematics(self.upper_arm, self.lower_arm);
+        let angles = self
+            .position
+            .inverse_kinematics(self.upper_arm, self.lower_arm);
 
         match angles {
-
             Ok(angles) => {
                 self.angles = Arm {
                     claw: self.angles.claw,
                     ..angles
                 }
             }
-            
+
             Err(()) => {
                 warn("Could not calculate inverse kinematics");
             }
         }
-
     }
 
     pub fn update(&mut self, gamepad: &Gamepad, delta: f64) -> Result<(), ComError> {
