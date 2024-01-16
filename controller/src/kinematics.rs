@@ -347,7 +347,7 @@ pub mod triangle {
 impl Debug for MotionField {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("MotionField")
-            .field("moption", &self.get_pivot_angle(0.))
+            .field("motion", &self.get_pivot_angle(0.))
             .finish()
     }
 }
