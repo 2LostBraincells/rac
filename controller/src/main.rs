@@ -1,23 +1,27 @@
-use std::{thread::sleep, time::{Duration, Instant}};
+use std::{
+    thread::sleep,
+    time::{Duration, Instant},
+};
 
 use gilrs::Gilrs;
+use kinematics::Joint;
 
 use crate::robot::*;
 
 mod communication;
 mod kinematics;
-mod robot;
 mod logging;
+mod robot;
 
 fn main() {
     // open serial connection
 
     let mut robot = Robot {
         angles: Arm {
-            base: Angle(30.),
-            shoulder: Angle(90.),
-            elbow: Angle(110.),
-            claw: Angle(100.),
+            base: Joint::default(),
+            shoulder: Joint::default(),
+            elbow: Joint::default(),
+            claw: Joint::default(),
         },
         ..Robot::new(100., 100.)
     };
@@ -37,13 +41,13 @@ fn main() {
 
         if let Some(gamepad_id) = gamepad {
             let gamepad = gilrs.gamepad(gamepad_id);
-            let delta = dbg!(Instant::now()-prev);
+            let delta = dbg!(Instant::now() - prev);
             prev = Instant::now();
             match robot.update(&gamepad, delta.as_secs_f64()) {
                 Ok(it) => it,
                 Err(err) => {
                     dbg!(err);
-                },
+                }
             };
         }
 
