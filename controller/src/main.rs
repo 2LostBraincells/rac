@@ -69,6 +69,9 @@ fn main() {
         }
 
         clearscreen::clear().unwrap();
-        println!("{:?}", robot.position);
+        println!("pos: {:?}", robot.position);
+        println!("vel: {:?}", robot.velocity);
+        println!("tve: {:?}", robot.target_velocity);
+        println!("ang: {:?}", robot.arm);
     }
 }
