@@ -7,6 +7,7 @@ use crate::robot::*;
 mod communication;
 mod kinematics;
 mod robot;
+mod logging;
 
 fn main() {
     // open serial connection

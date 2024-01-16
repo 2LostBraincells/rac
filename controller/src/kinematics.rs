@@ -1,23 +1,27 @@
-use std::{cmp::max, f64::consts::PI, ops::{Sub, Add, AddAssign}};
+use std::{
+    f64::consts::PI,
+    ops::{Add, AddAssign, Mul, Sub, SubAssign},
+};
 
 use crate::robot::*;
 
-use self::geometry::triangle::a_from_lengths;
+use self::triangle::a_from_lengths;
 
 /// Defines a position in 3d space
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone)]
 pub struct Position {
-    /// Width
+    /// Side to side
     pub x: f64,
 
-    /// Height
+    /// Up and down
     pub y: f64,
 
-    /// Depth
+    /// Forward and backward
     pub z: f64,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Copy, Clone)]
+
 pub struct SpherePos {
     /// Azmut angle
     pub azmut: f64,
@@ -32,92 +36,93 @@ pub struct SpherePos {
     pub f_dst: f64,
 }
 
-impl Position{
-    pub fn inverse_kinematics(&mut self, upper_arm: f64, lower_arm: f64) -> Arm {
-        let pos = &self;
+impl Position {
+    /// Clamp all the values in the position to a range
+    ///
+    /// # Arguments
+    /// * `min` - The minimum value for the position
+    /// * `max` - The maximum value for the position
+    ///
+    /// # Examples
+    /// ```rust
+    /// use robot::kinematics::Position;
+    /// let mut position = Position::new(1., 1., 1.);
+    /// position.clamp(0., 0.);
+    ///
+    /// assert_eq!(position, Position::new(0., 0., 0.));
+    /// ```
+    pub fn cube_clamp(&mut self, min: f64, max: f64) {
+        self.x = self.x.clamp(min, max);
+        self.y = self.y.clamp(min, max);
+        self.z = self.z.clamp(min, max);
+    }
+
+    /// Creates a new Position
+    /// # Arguments
+    /// * `x` - Side to side position
+    /// * `y` - Up and down position
+    /// * `z` - Forward and backward position
+    #[allow(unused)]
+    pub fn new(x: f64, y: f64, z: f64) -> Self {
+        Self { x, y, z }
+    }
+
+    /// Calculates the angles for the arm to reach a position
+    ///
+    /// # Arguments
+    /// * `upper_arm` - The length of the upper Arm
+    /// * `lower_arm` - The length of the lower Arm
+    ///
+    /// # Returns
+    /// Ok(Arm) - The angles for the arm to reach the position
+    /// Err(()) - No valid solution was found
+    ///
+    /// # Examples
+    /// ```rust
+    /// use robot::kinematics::Position;
+    ///
+    /// let mut position = Position::new(1., 1., 1.);
+    ///
+    /// let arm = robot.inverse_kinematics(10,10);
+    /// ```
+    pub fn inverse_kinematics(&mut self, upper_arm: f64, lower_arm: f64) -> Result<Arm, ()> {
         let spos = &self.to_sphere();
 
-        let beta = a_from_lengths(upper_arm, lower_arm, spos.dst);
+        let base = spos.azmut.to_degrees() + 90.;
 
-        let alpha = {
-            let x = (spos.f_dst / pos.y).atan();
-            let y = a_from_lengths(spos.dst, lower_arm, upper_arm);
+        if base.is_nan() {
+            return Err(());
+        }
 
-            if x + y > PI / 2. { 
-                PI - x - y
+        let elbow = a_from_lengths(upper_arm, lower_arm, spos.dst).to_degrees();
+
+        if elbow.is_nan() {
+            return Err(());
+        }
+
+        let shoulder = {
+            // arctan(f_dst / y)
+            let a = (spos.f_dst / self.y).atan();
+            let b = a_from_lengths(spos.dst, lower_arm, upper_arm);
+
+            if a + b > PI / 2. {
+                PI - a - b
             } else {
-                x + y
-            }
-        };
-
-        Arm {
-            base: Angle(spos.azmut.to_degrees() + 90.),
-            shoulder: Angle(alpha.to_degrees()),
-            elbow: Angle(beta.to_degrees()),
-            claw: Angle(0.)
-        }
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use std::f64::consts::SQRT_2;
-
-    use crate::kinematics::Robot;
-
-    #[test]
-    fn angle_test() {
-        let mut robot = Robot::new(1., 1.);
-        robot.position.x = 0.;
-        robot.position.z = SQRT_2;
-        robot.position.y = 0.;
-
-        robot.update_ik();
-
-        assert_eq!(robot.angles.base.inner().round(), 90.);
-        assert_eq!(robot.angles.shoulder.inner().round(), 45.);
-        assert_eq!(robot.angles.elbow.inner().round(), 90.);
-    }
-}
-
-mod geometry {
-    pub mod triangle {
-        /// The angles for the corner between a and b in radians
-        ///
-        /// x = -c^2 + a^2 + b^2
-        /// y = 2ab
-        /// arccos(x/y)
-        pub fn a_from_lengths(a: f64, b: f64, c: f64) -> f64 {
-            let x = -(c * c) + a * a + b * b;
-            let y = 2. * a * b;
-            (x / y).acos()
-        }
-
-        #[cfg(test)]
-        mod test {
-            use crate::kinematics::geometry::triangle;
-
-            #[test]
-            fn a_from_lengths() {
-                assert_eq!(triangle::a_from_lengths(3., 4., 5.).to_degrees(), 90.00);
-                assert_eq!(
-                    triangle::a_from_lengths(2., 2., 2.).to_degrees().round(),
-                    60.00
-                );
+                a + b
             }
         }
-    }
-}
+        .to_degrees();
 
-pub struct NoNan(f64);
-
-impl NoNan {
-    pub fn inner(&self) -> &f64 {
-        if self.0.is_nan() {
-            &0.
-        } else {
-            &self.0
+        if shoulder.is_nan() {
+            return Err(());
         }
+
+        Ok(Arm {
+            base: Angle(base),
+            shoulder: Angle(shoulder),
+            elbow: Angle(elbow),
+            claw: Angle(0.),
+        })
     }
 }
 
@@ -132,40 +137,32 @@ impl Default for Position {
 }
 
 impl Position {
+    /// sqrt(X^2 + Z^2)
     pub fn f_dst(&self) -> f64 {
         (self.x * self.x + self.z * self.z).sqrt()
     }
 
+    /// sqrt(X^2 + Y^2 + Z^2)
     pub fn dst(&self) -> f64 {
         (self.x * self.x + self.y * self.y + self.z * self.z).sqrt()
     }
 
+    /// arctan(x / z)
     pub fn azmut(&self) -> f64 {
         (self.x / self.z).atan()
     }
 
+    /// arctan(f_dst / y)
     pub fn polar(&self) -> f64 {
         (self.f_dst() / self.y).atan()
     }
 
     pub fn to_sphere(&self) -> SpherePos {
-        // sqrt(X^2 + Z^2)
-        let f_dst = self.f_dst();
-
-        // sqrt(X^2 + Y^2 + Z^2)
-        let dst = self.dst();
-        
-        // arctan(x / z)
-        let azmut = self.azmut();
-
-        // arctan(f_dst / y)
-        let polar = self.polar();
-
         SpherePos {
-            azmut: *NoNan(azmut).inner(),
-            polar: *NoNan(polar).inner(),
-            dst: *NoNan(dst).inner(),
-            f_dst: *NoNan(f_dst).inner(),
+            azmut: self.azmut(),
+            polar: (self.polar()),
+            dst: (self.dst()),
+            f_dst: (self.f_dst()),
         }
     }
 }
@@ -200,7 +197,7 @@ impl AddAssign for Position {
             x: self.x + rhs.x,
             y: self.y + rhs.y,
             z: self.z + rhs.z,
-        } 
+        }
     }
 }
 
@@ -211,5 +208,160 @@ impl SpherePos {
             y: self.dst * self.polar.sin(),
             z: self.dst * self.azmut.sin(),
         }
+    }
+}
+
+impl Eq for Position {}
+impl PartialEq for Position {
+    fn eq(&self, other: &Self) -> bool {
+        self.x == other.x && self.y == other.y && self.z == other.z
+    }
+
+    fn ne(&self, other: &Self) -> bool {
+        self.x != other.x || self.y != other.y || self.z != other.z
+    }
+}
+
+impl SubAssign for Position {
+    fn sub_assign(&mut self, rhs: Self) {
+        *self = Self {
+            x: self.x - rhs.x,
+            y: self.y - rhs.y,
+            z: self.z - rhs.z,
+        }
+    }
+}
+
+impl Mul<f64> for Position {
+    type Output = Self;
+
+    fn mul(self, rhs: f64) -> Self::Output {
+        Self {
+            x: self.x * rhs,
+            y: self.y * rhs,
+            z: self.z * rhs,
+        }
+    }
+}
+
+pub mod triangle {
+    /// The angles for the corner between a and b in radians
+    ///
+    /// x = -c^2 + a^2 + b^2
+    /// y = 2ab
+    /// arccos(x/y)
+    pub fn a_from_lengths(a: f64, b: f64, c: f64) -> f64 {
+        let x = -(c * c) + a * a + b * b;
+        let y = 2. * a * b;
+        (x / y).acos()
+    }
+
+    #[cfg(test)]
+    mod test {
+        use crate::kinematics::triangle;
+
+        #[test]
+        fn a_from_lengths() {
+            assert_eq!(triangle::a_from_lengths(3., 4., 5.).to_degrees(), 90.00);
+            assert_eq!(
+                triangle::a_from_lengths(2., 2., 2.).to_degrees().round(),
+                60.00
+            );
+        }
+    }
+}
+
+#[cfg(test)]
+mod position {
+
+    use std::f64::consts::SQRT_2;
+
+    use crate::kinematics::Position;
+
+    #[test]
+    fn inverse_kinematics() {
+        let mut position = Position::new(SQRT_2, 0., 0.);
+
+        let actual = position.inverse_kinematics(1., 1.).unwrap();
+
+        assert_eq!(
+            (actual.base.0 * 10.0f64.powi(4)).round() / 10.0f64.powi(4),
+            180.
+        );
+        assert_eq!(
+            (actual.shoulder.0 * 10.0f64.powi(4)).round() / 10.0f64.powi(4),
+            45.
+        );
+        assert_eq!(
+            (actual.elbow.0 * 10.0f64.powi(4)).round() / 10.0f64.powi(4),
+            90.
+        );
+
+        let mut position = Position::new(0., 0., 0.);
+
+        let actual = position.inverse_kinematics(0., 0.);
+
+        assert!(actual.is_err());
+    }
+
+    #[test]
+    fn addition() {
+        let a = Position::new(1., 2., 3.);
+        let mut b = Position::new(2., 2., 2.);
+        let c = Position::new(3., 2., 1.);
+
+        assert_eq!(a + b, Position::new(3., 4., 5.));
+        assert_eq!(a + c, Position::new(4., 4., 4.));
+
+        b += c;
+        assert_eq!(b, Position::new(5., 4., 3.));
+    }
+
+    #[test]
+    fn subtraction() {
+        let a = Position::new(1., 2., 3.);
+        let mut b = Position::new(2., 2., 2.);
+        let c = Position::new(3., 2., 1.);
+
+        assert_eq!(a - b, Position::new(-1., 0., 1.));
+        assert_eq!(a - c, Position::new(-2., 0., 2.));
+
+        b -= c;
+
+        assert_eq!(b, Position::new(-1., 0., 1.));
+    }
+}
+
+#[cfg(test)]
+mod sphere_pos {
+    use crate::kinematics::{Position, SpherePos};
+    use std::f64::consts::{PI, SQRT_2};
+
+    #[test]
+    fn to_position() {
+        let pos = SpherePos {
+            azmut: 1.,
+            polar: 1.,
+            f_dst: 0.,
+            dst: 0.,
+        };
+
+        let actual = pos.to_position();
+        let expected = Position::new(0., 0., 0.);
+
+        assert_eq!(actual, expected);
+
+        let pos = SpherePos {
+            azmut: PI / 4.,
+            polar: 0.,
+            f_dst: SQRT_2,
+            dst: SQRT_2,
+        };
+
+        let actual = pos.to_position();
+
+        assert_eq!((actual.x * 10.0f64.powi(4)).round() / 10.0f64.powi(4), 1.);
+        assert_eq!((actual.y * 10.0f64.powi(4)).round() / 10.0f64.powi(4), 0.);
+        assert_eq!((actual.z * 10.0f64.powi(4)).round() / 10.0f64.powi(4), 1.);
     }
 }
