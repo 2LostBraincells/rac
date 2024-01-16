@@ -47,6 +47,11 @@ pub struct Joint {
 /// Type association for Motion trait that implements debug
 pub type MotionField = Box<dyn Motion>;
 
+/// A double linkage based motion system
+///
+/// The controlled angle is connected to the arm using two rods.
+/// One of the rods is tied to the controlled pivot point.
+/// the other is connected between the first rod and the arm
 pub struct DoubleLinkage {
     /// Distance from the pivot to the connection point
     pub connection_radial_offset: f64,
@@ -66,7 +71,25 @@ pub struct DoubleLinkage {
     pub connection_rod_length: f64,
 }
 
+/// A direct drive based motion system
+///
+/// The controlled angle is directly connected to the arm
 pub struct DirectDrive {}
+
+/// A direct drive motions system with a offset
+///
+/// The controlled angle is directly connected to the arm but with a offset
+pub struct DirectDriveOffset {
+    pub offset: f64,
+}
+
+/// A gear drive based motion system
+///
+/// The controlled angle is connected to the arm and a gear ratio is used when calculating the
+/// controlled angle
+pub struct GearDrive {
+    pub gear_ratio: f64,
+}
 
 /// Trait for join motion
 pub trait Motion {
@@ -131,6 +154,7 @@ impl Position {
         Ok((base, shoulder, elbow))
     }
 
+    /// Converts the 3d cordinates into spherical cordinates
     pub fn to_sphere(&self) -> SpherePos {
         // sqrt(X^2 + Z^2)
         let f_dst = (self.x * self.x + self.z * self.z).sqrt();
@@ -288,6 +312,18 @@ impl Motion for DoubleLinkage {
 
 
         angle.to_degrees()
+    }
+}
+
+impl Motion for DirectDriveOffset {
+    fn get_pivot_angle(&self, target: f64) -> f64 {
+        target + self.offset
+    }
+}
+
+impl Motion for GearDrive {
+    fn get_pivot_angle(&self, target: f64) -> f64 {
+        target * self.gear_ratio
     }
 }
 
