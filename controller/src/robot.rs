@@ -29,10 +29,9 @@ pub struct Robot {
     // maximum change in velocity per second
     pub acceleration: f64,
 
-    pub angles: Arm,
+    pub arm: Arm,
     pub upper_arm: f64,
     pub lower_arm: f64,
-    pub square_sum: f64,
     pub claw_open: bool,
     pub connection: Connection,
 }
@@ -58,22 +57,6 @@ pub struct Servos {
 }
 
 impl Robot {
-    pub fn new(lower_arm: f64, upper_arm: f64) -> Robot {
-        Robot {
-            position: Position::default(),
-            target_position: None,
-            velocity: Position::default(),
-            max_velocity: Position::default(),
-            target_velocity: Position::default(),
-            acceleration: 1.,
-            angles: Arm::default(),
-            upper_arm,
-            lower_arm,
-            square_sum: upper_arm * upper_arm + lower_arm * lower_arm,
-            claw_open: false,
-            connection: Connection::default(),
-        }
-    }
 
     pub fn update_gamepad(&mut self, gamepad: &Gamepad) {
         let right_stick_axis_y = gamepad.value(Axis::RightStickY) as f64;
@@ -120,9 +103,9 @@ impl Robot {
 
         match angles {
             Ok(angles) => {
-                    self.angles.base.angle = angles.0;
-                    self.angles.shoulder.angle = angles.1;
-                    self.angles.elbow.angle = angles.2;
+                    self.arm.base.angle = angles.0;
+                    self.arm.shoulder.angle = angles.1;
+                    self.arm.elbow.angle = angles.2;
                 }
 
             Err(()) => {
@@ -135,7 +118,7 @@ impl Robot {
         self.update_gamepad(gamepad);
         self.update_position(delta);
         self.update_ik();
-        let data = self.angles.to_servos().to_message();
+        let data = self.arm.to_servos().to_message();
         self.connection.write(&data, true)
     }
 }

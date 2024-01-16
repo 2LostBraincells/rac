@@ -4,7 +4,7 @@ use std::{
 };
 
 use gilrs::Gilrs;
-use kinematics::Joint;
+use kinematics::{DirectDrive, DirectDriveOffset, DoubleLinkage, Joint, Position};
 
 use crate::robot::*;
 
@@ -17,13 +17,30 @@ fn main() {
     // open serial connection
 
     let mut robot = Robot {
-        angles: Arm {
-            base: Joint::default(),
-            shoulder: Joint::default(),
-            elbow: Joint::default(),
-            claw: Joint::default(),
+        acceleration: 10.,
+        max_velocity: Position::new(10., 10., 10.),
+        upper_arm: 100.,
+        lower_arm: 100.,
+        arm: Arm {
+            base: Joint::new(0., 180., Box::new(DirectDriveOffset { offset: 90. })),
+            claw: Joint::new(0., 180., Box::new(DirectDrive::new())),
+            shoulder: Joint::new(
+                0.,
+                180.,
+                Box::new(DoubleLinkage::new(1., 10., 10., 1., 10., 20.)),
+            ),
+            elbow: Joint::new(
+                0.,
+                180.,
+                Box::new(DoubleLinkage::new(1., 10., 10., 1., 10., 20.)),
+            ),
         },
-        ..Robot::new(100., 100.)
+        position: Position::new(0.,0.,0.),
+        velocity: Position::new(0.,0.,0.),
+        target_position: None,
+        target_velocity: Position::new(0.,0.,0.),
+        claw_open: false,
+        connection: communication::Connection::new("/dev/ttyACM0", 115_200),
     };
 
     let mut gilrs = Gilrs::new().expect("Could not setup gilrs");

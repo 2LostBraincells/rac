@@ -44,6 +44,7 @@ pub struct Joint {
     pub motion: MotionField,
 }
 
+
 /// Type association for Motion trait that implements debug
 pub type MotionField = Box<dyn Motion>;
 
@@ -275,6 +276,17 @@ impl DoubleLinkage {
     }
 }
 
+impl Joint {
+    pub fn new(min: f64, max: f64, motion: MotionField) -> Self {
+        Self {
+            angle: 0.,
+            min,
+            max,
+            motion,
+        }
+    }
+}
+
 impl Motion for DirectDrive {
     fn get_pivot_angle(&self, target: f64) -> f64 {
         target
@@ -301,15 +313,10 @@ impl Motion for DoubleLinkage {
                 self.connection_rod_length,
             );
 
-            let y = triangle::a_from_lengths(
-                connection_to_controller,
-                controller.1,
-                connection.1,
-            );
+            let y = triangle::a_from_lengths(connection_to_controller, controller.1, connection.1);
 
-            x+y
+            x + y
         };
-
 
         angle.to_degrees()
     }
