@@ -1,19 +1,21 @@
-use std::{collections::VecDeque, time::{Duration, Instant}};
+use std::{
+    collections::VecDeque,
+    time::{Duration, Instant},
+};
 
-use serialport::{Error, SerialPort};
 use crate::logging::*;
-
-/// port for arduino communication
-const ARDUINO_PORT: &str = "/dev/ttyACM0";
-const ARDUINO_BAUD: u32 = 115200;
+use serialport::{Error, SerialPort};
 
 /// Indicates a new message
 const PREFIX: u8 = b'\r';
 
-
 #[derive(Debug)]
 pub struct Connection {
-    pub port: Option<Box<dyn SerialPort>>,
+    pub port: &'static str,
+    pub baud: u32,
+
+    /// Serial connection to arduino
+    pub con: Option<Box<dyn SerialPort>>,
 
     /// Instant of last write
     pub last_write: Instant,
@@ -40,7 +42,9 @@ pub type Message = Vec<u8>;
 impl Default for Connection {
     fn default() -> Self {
         Self {
-            port: None,
+            port: "",
+            baud: 0,
+            con: None,
             last_write: Instant::now(),
             read_buf: Vec::new(),
             msg_buf: VecDeque::new(),
@@ -50,6 +54,18 @@ impl Default for Connection {
 }
 
 impl Connection {
+    pub fn new(port: &'static str, baud: u32) -> Self {
+        Self {
+            port,
+            baud,
+            con: None,
+            last_write: Instant::now(),
+            read_buf: Vec::new(),
+            msg_buf: VecDeque::new(),
+            no_connect: false,
+        }
+    }
+
     /// Connect to arduino
     ///
     /// Attempts to open a serial connection to the arduino
@@ -64,8 +80,8 @@ impl Connection {
         }
 
         // connect arduino
-        self.port = Some(
-            serialport::new(ARDUINO_PORT, ARDUINO_BAUD)
+        self.con = Some(
+            serialport::new(self.port, self.baud)
                 .timeout(Duration::from_millis(100))
                 .open()?,
         );
@@ -98,7 +114,7 @@ impl Connection {
         }
 
         // Make sure arduino is connected
-        let port = match &mut self.port {
+        let port = match &mut self.con {
             None => return Err(ComError::NotConnected),
             Some(port) => port,
         };
@@ -127,16 +143,14 @@ impl Connection {
         if !allow_drooped {
             unreachable!("im to lazy to make it work otherwise");
         }
-        
 
-         // if (Instant::now() - self.last_write) > Duration::from_millis(10) {
-         //     self.last_write = Instant::now();
-         // } else {
-         //     println!("Ratelimiting ({}s left)", (Instant::now() - self.last_write).as_secs_f32());
-         //     Err(ComError::Ratelimit)
-         // }
-         self.write_raw(message.as_slice())
-
+        // if (Instant::now() - self.last_write) > Duration::from_millis(10) {
+        //     self.last_write = Instant::now();
+        // } else {
+        //     println!("Ratelimiting ({}s left)", (Instant::now() - self.last_write).as_secs_f32());
+        //     Err(ComError::Ratelimit)
+        // }
+        self.write_raw(message.as_slice())
     }
 
     /// Read from serial buffer and return if a valid message was recived
@@ -155,7 +169,7 @@ impl Connection {
             return Ok(None);
         }
 
-        let port: &mut Box<dyn SerialPort> = match &mut self.port {
+        let port: &mut Box<dyn SerialPort> = match &mut self.con {
             None => return Err(ComError::NotConnected),
             Some(port) => port,
         };
@@ -182,4 +196,3 @@ impl Connection {
         Ok(self.msg_buf.pop_front())
     }
 }
-

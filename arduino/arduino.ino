@@ -56,11 +56,21 @@ void loop() {
 void serialEvent() {
     if (Serial.read() != '\r') return;
     Serial.readBytesUntil('\n', (char*)&message, 8);
-    
+
     base.writeMicroseconds(message.base);
     shoulder.writeMicroseconds(message.shoulder);
     elbow.writeMicroseconds(message.elbow);
     claw.writeMicroseconds(message.claw);
+
+    if (message.base == 0xFFFFFFFF) return;
+    if (message.shoulder == 0xFFFFFFFF) return;
+    if (message.elbow == 0xFFFFFFFF) return;
+    if (message.base == 0xFFFFFFFF) return;
+
+    base.attach(3);
+    shoulder.attach(3);
+    elbow.attach(3);
+    claw.attach(3);
 
     // Serial.print("base: ");
     // Serial.print(message.base);
