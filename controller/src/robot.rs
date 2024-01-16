@@ -63,9 +63,9 @@ impl Robot {
             position: Position::default(),
             target_position: None,
             velocity: Position::default(),
-            max_velocity: Position::default(),
+            max_velocity: Position::new(30.,30.,30.),
             target_velocity: Position::default(),
-            acceleration: 1.,
+            acceleration: 100.,
             angles: Arm::default(),
             upper_arm,
             lower_arm,
@@ -76,13 +76,13 @@ impl Robot {
     }
 
     pub fn update_gamepad(&mut self, gamepad: &Gamepad) {
-        let right_stick_axis_y = gamepad.value(Axis::RightStickY) as f64;
-        let left_stick_axis_x = gamepad.value(Axis::LeftStickX) as f64;
-        let left_stick_axis_y = gamepad.value(Axis::LeftStickY) as f64;
+        let right_axis_y = gamepad.value(Axis::RightStickY) as f64;
+        let left_axis_x = gamepad.value(Axis::LeftStickX) as f64;
+        let left_axis_y = gamepad.value(Axis::LeftStickY) as f64;
 
-        self.target_velocity.z = self.max_velocity.z * left_stick_axis_y;
-        self.target_velocity.x = self.max_velocity.x * left_stick_axis_x;
-        self.target_velocity.y = self.max_velocity.y * right_stick_axis_y;
+        self.target_velocity.z = self.max_velocity.z * (if left_axis_y.abs() < 0.2 { 0. } else {left_axis_y});
+        self.target_velocity.x = self.max_velocity.x * (if left_axis_x.abs() < 0.2 { 0. } else {left_axis_x});
+        self.target_velocity.y = self.max_velocity.y * (if right_axis_y.abs() < 0.2 { 0. } else {right_axis_y});
 
         if gamepad.is_pressed(Button::Start) {
             panic!("Start button pressed");
