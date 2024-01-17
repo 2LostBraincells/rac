@@ -411,7 +411,7 @@ impl Position {
 
     /// arctan(x / z)
     pub fn azmut(&self) -> f64 {
-        (self.x / self.z).atan()
+        (self.x / self.z).atan();
     }
 
     /// arctan(f_dst / y)
@@ -529,6 +529,13 @@ mod position {
     use crate::kinematics::Position;
 
     #[test]
+    fn to_sphere() {
+        let pos = Position::new(-1., 0., -1.);
+        dbg!(pos, pos.to_sphere());
+        panic!("hi");
+    }
+
+    #[test]
     fn inverse_kinematics() {
         let mut position = Position::new(SQRT_2, 0., 0.);
 
@@ -604,5 +611,10 @@ mod sphere_pos {
         assert_eq!((actual.x * 10.0f64.powi(4)).round() / 10.0f64.powi(4), 1.);
         assert_eq!((actual.y * 10.0f64.powi(4)).round() / 10.0f64.powi(4), 0.);
         assert_eq!((actual.z * 10.0f64.powi(4)).round() / 10.0f64.powi(4), 1.);
+
+        let pos = Position::new(-10., -10., -10.);
+        let sphere = pos.to_sphere();
+
+        assert_eq!(pos, sphere.to_position());
     }
 }

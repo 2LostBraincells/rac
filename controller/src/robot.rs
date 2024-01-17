@@ -99,6 +99,7 @@ impl Robot {
     pub fn target_position_update(&mut self, target: Position) {
         let delta = target - self.position;
         let mut sphere = delta.to_sphere();
+        dbg!(delta, sphere);
 
         // reset target position if we are close enough
         if sphere.dst < 0.01 {
@@ -108,6 +109,7 @@ impl Robot {
 
         // distance needed to stop at current velocity
         let breaking_distance = self.velocity.to_sphere().dst / (2. * self.acceleration);
+        dbg!(breaking_distance);
 
         // conntineously accelerate until we reach the breaking point
         if sphere.dst < breaking_distance {
@@ -115,7 +117,7 @@ impl Robot {
             self.target_velocity = Position::new(0., 0., 0.);
         } else {
             // accelerate
-            sphere.dst = 1000.;
+            sphere.dst = 100.;
             self.target_velocity = sphere.to_position();
         }
     }
@@ -171,11 +173,11 @@ impl Robot {
 
         match self.target_position {
             Some(target) => self.target_position_update(target),
-            None => {
-                self.update_velocity(delta);
-                self.update_position(delta);
-            }
+            None => { }
         }
+
+        self.update_velocity(delta);
+        self.update_position(delta);
 
         self.update_ik();
 
