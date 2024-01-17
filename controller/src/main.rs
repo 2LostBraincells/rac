@@ -1,6 +1,6 @@
 use crate::kinematics::{
     joints::{DirectDrive, DirectDriveOffset, DoubleLinkage, Joint},
-    position::Vec3D,
+    position::CordinateVec,
 };
 use std::{
     thread::sleep,
@@ -19,7 +19,7 @@ mod robot;
 fn main() {
     let mut robot = Robot {
         acceleration: 1040.,
-        max_velocity: Vec3D::new(10., 10., 10.),
+        max_velocity: CordinateVec::new(10., 10., 10.),
         upper_arm: 100.,
         lower_arm: 100.,
         arm: Arm {
@@ -36,10 +36,10 @@ fn main() {
                 Box::new(DoubleLinkage::new(1., 10., 10., 1., 10., 20.)),
             ),
         },
-        position: Vec3D::new(0., 0., 0.),
-        velocity: Vec3D::new(0., 0., 0.),
-        target_position: Some(Vec3D::new(50., 50., 50.)),
-        target_velocity: Vec3D::new(0., 0., 0.),
+        position: CordinateVec::new(0., 0., 0.),
+        velocity: CordinateVec::new(0., 0., 0.),
+        target_position: Some(CordinateVec::new(50., 50., 50.)),
+        target_velocity: CordinateVec::new(0., 0., 0.),
         claw_open: false,
         connection: communication::Connection::new("/dev/ttyACM0", 115_200),
     };

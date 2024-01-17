@@ -2,7 +2,7 @@ use std::cmp::PartialEq;
 
 use crate::{
     communication::{ComError, Connection},
-    kinematics::position::Vec3D,
+    kinematics::position::CordinateVec,
     kinematics::joints::Joint,
     logging::warn,
 };
@@ -19,13 +19,13 @@ pub const MIN_SERVO: u16 = 250;
 /// Defines a robot and its physical properties
 #[derive(Debug)]
 pub struct Robot {
-    pub position: Vec3D,
-    pub target_position: Option<Vec3D>,
+    pub position: CordinateVec,
+    pub target_position: Option<CordinateVec>,
 
     // as a velocity vector
-    pub velocity: Vec3D,
-    pub max_velocity: Vec3D,
-    pub target_velocity: Vec3D,
+    pub velocity: CordinateVec,
+    pub max_velocity: CordinateVec,
+    pub target_velocity: CordinateVec,
 
     // maximum change in velocity per second
     pub acceleration: f64,
@@ -82,7 +82,7 @@ impl Robot {
         self.target_position = None;
 
         self.target_velocity = self.max_velocity
-            * Vec3D {
+            * CordinateVec {
                 x: self.parse_gamepad_axis(left_axis_x, 0.2),
                 y: self.parse_gamepad_axis(left_axis_y, 0.2),
                 z: self.parse_gamepad_axis(right_axis_y, 0.2),
@@ -98,19 +98,19 @@ impl Robot {
     /// Accelerate towards the target position until within the distance required to stop
     ///
     /// If the target position is reached, set target position to None
-    pub fn target_position_update(&mut self, target: Vec3D) {
+    pub fn target_position_update(&mut self, target: CordinateVec) {
         let delta = target - self.position;
         let mut sphere = delta.to_sphere();
-        let acceleration = Vec3D::new(self.acceleration, self.acceleration, self.acceleration);
+        let acceleration = CordinateVec::new(self.acceleration, self.acceleration, self.acceleration);
 
         // distance needed to stop at current velocity
         let breaking_distance = dbg!(self.velocity.dst().powi(2) / (2. * acceleration.dst()));
 
         // conntineously accelerate until we reach the breaking point
-        if sphere.dst < breaking_distance {
+        if sphere.distance < breaking_distance {
             // breake
             self.target_position = None;
-            self.target_velocity = Vec3D::new(0., 0., 0.);
+            self.target_velocity = CordinateVec::new(0., 0., 0.);
         } else {
             // accelerate
             sphere.update_dst(10000.);
@@ -141,7 +141,7 @@ impl Robot {
         let mut sphere = self.position.to_sphere();
 
         // clamp distance from origin
-        if sphere.dst >= self.upper_arm + self.lower_arm {
+        if sphere.distance >= self.upper_arm + self.lower_arm {
             sphere.update_dst(self.upper_arm + self.lower_arm);
             self.position = sphere.to_position();
         }
@@ -256,11 +256,11 @@ mod test {
     #[test]
     pub fn parse_gamepad() {
         let mut robo = Robot {
-            position: Vec3D::new(0., 0., 0.),
+            position: CordinateVec::new(0., 0., 0.),
             target_position: None,
-            velocity: Vec3D::new(0., 0., 0.),
-            max_velocity: Vec3D::new(100., 100., 100.),
-            target_velocity: Vec3D::new(0., 0., 0.),
+            velocity: CordinateVec::new(0., 0., 0.),
+            max_velocity: CordinateVec::new(100., 100., 100.),
+            target_velocity: CordinateVec::new(0., 0., 0.),
             acceleration: 100.,
             arm: Arm::default(),
             upper_arm: 100.,

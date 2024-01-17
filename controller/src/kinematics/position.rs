@@ -1,12 +1,12 @@
 use crate::kinematics::triangle::a_from_lengths;
 use core::{
     f64::consts::PI,
-    ops::{Mul, SubAssign, Add, AddAssign, Sub},
+    ops::{Add, AddAssign, Mul, Sub, SubAssign},
 };
 
-/// Defines a position in 3d space
+/// Defines a 3d position using x, y and z coordinates
 #[derive(Debug, Copy, Clone)]
-pub struct Vec3D {
+pub struct CordinateVec {
     /// Side to side
     pub x: f64,
 
@@ -17,23 +17,23 @@ pub struct Vec3D {
     pub z: f64,
 }
 
+/// Defines a position using spherical coordinates
 #[derive(Debug, Copy, Clone)]
-
-pub struct SpherePos {
-    /// Azmut angle
+pub struct SphereVec {
+    /// Horizontal angle from origin to position from the x axis
     pub azmut: f64,
 
-    /// Polar angle
+    /// Vertical angle from origin to position from the z axis
     pub polar: f64,
 
-    /// 3d distance from origin
-    pub dst: f64,
+    /// Distance from origin
+    pub distance: f64,
 
     /// Distance from origin on flat ground
-    pub f_dst: f64,
+    pub flat_distance: f64,
 }
 
-impl Vec3D {
+impl CordinateVec {
     /// Creates a new Position
     /// # Arguments
     /// * `x` - Side to side position
@@ -53,10 +53,10 @@ impl Vec3D {
     /// # Examples
     /// ```rust
     /// use robot::kinematics::Position;
-    /// let mut position = Position::new(1., 1., 1.);
-    /// position.clamp(0., 0.);
+    /// let mut position = Position::new(12., 9., -50.);
+    /// position.clamp(-5., 10.);
     ///
-    /// assert_eq!(position, Position::new(0., 0., 0.));
+    /// assert_eq!(position, Position::new(12., 9., -5.));
     /// ```
     pub fn cube_clamp(&mut self, min: f64, max: f64) {
         self.x = self.x.clamp(min, max);
@@ -72,6 +72,7 @@ impl Vec3D {
     ///
     /// # Returns
     /// Ok(Arm) - The angles for the arm to reach the position
+    ///
     /// Err(()) - No valid solution was found
     ///
     /// # Examples
@@ -80,31 +81,27 @@ impl Vec3D {
     ///
     /// let mut position = Position::new(1., 1., 1.);
     ///
-    /// let arm = robot.inverse_kinematics(10,10);
+    /// let arm = position.inverse_kinematics(10,10);
     /// ```
     pub fn inverse_kinematics(
         &mut self,
         upper_arm: f64,
         lower_arm: f64,
     ) -> Result<(f64, f64, f64), ()> {
+        // spherical representation of the position
         let spos = &self.to_sphere();
 
+        // base angle
         let base = spos.azmut.to_degrees() + 90.;
 
-        if base.is_nan() {
-            return Err(());
-        }
+        // elbow angle
+        let elbow = a_from_lengths(upper_arm, lower_arm, spos.distance).to_degrees();
 
-        let elbow = a_from_lengths(upper_arm, lower_arm, spos.dst).to_degrees();
-
-        if elbow.is_nan() {
-            return Err(());
-        }
-
+        // shoulder angle
         let shoulder = {
             // arctan(f_dst / y)
-            let a = (spos.f_dst / self.z).atan();
-            let b = a_from_lengths(spos.dst, lower_arm, upper_arm);
+            let a = (spos.flat_distance / self.z).atan();
+            let b = a_from_lengths(spos.distance, lower_arm, upper_arm);
 
             if a + b > PI / 2. {
                 PI - a - b
@@ -114,15 +111,164 @@ impl Vec3D {
         }
         .to_degrees();
 
-        if shoulder.is_nan() {
+        // make sure all the angles are valid
+        if shoulder.is_nan() || base.is_nan() || elbow.is_nan() {
             return Err(());
         }
 
         Ok((base, shoulder, elbow))
     }
+
+    /// Calculates the distance from origin on flat ground
+    ///
+    /// since this value is only on the x,z plane the z axis is irrelevant
+    ///
+    /// sqrt(X^2 + Z^2)
+    pub fn f_dst(&self) -> f64 {
+        (self.x.powi(2) + self.y.powi(2)).sqrt()
+    }
+
+    /// Calculates the distance from origin
+    ///
+    /// sqrt(X^2 + Y^2 + Z^2)
+    pub fn dst(&self) -> f64 {
+        (self.x.powi(2) + self.z.powi(2) + self.z.powi(2)).sqrt()
+    }
+
+    /// Calculates the horizontal angle from origin to position from the x axis
+    ///
+    /// arctan(x / z)
+    pub fn azmut(&self) -> f64 {
+        match self.y.signum() as i8 {
+            1 => (self.y / self.x).atan(),
+            -1 => (self.y / self.x).atan() + PI,
+            _ => 0.,
+        }
+    }
+
+    /// Calculates the vertical angle from origin to position from the z axis
+    ///
+    /// arctan(f_dst / y)
+    pub fn polar(&self) -> f64 {
+        match self.z.signum() as i8 {
+            1 => (self.f_dst() / self.z).atan(),
+            -1 => (self.f_dst() / self.z).atan() + PI,
+            _ => 0.,
+        }
+    }
+
+    /// Converts a 3d position to spherical coordinates
+    ///
+    /// Due to floating point errors the position might
+    /// not be exactly right but it is usualy close enough
+    ///
+    /// # Examples
+    /// ```rust
+    /// use std::f64::consts::{PI, SQRT_2};
+    /// use robot::kinematics::Position;
+    ///
+    /// let position = Position::new(1., 1., 0.);
+    ///
+    /// let sphere = position.to_sphere();
+    ///
+    /// assert_eq!(sphere.azmut, PI/2);
+    /// assert_eq!(sphere.polar, 0.);
+    /// assert_eq!(sphere.dst, SQRT_2);
+    /// assert_eq!(sphere.f_dst, SQRT_2);
+    /// ```
+    pub fn to_sphere(&self) -> SphereVec {
+        SphereVec {
+            azmut: self.azmut(),
+            polar: self.polar(),
+            distance: self.dst(),
+            flat_distance: self.f_dst(),
+        }
+    }
 }
 
-impl Default for Vec3D {
+impl SphereVec {
+    /// Creates a new position
+    ///
+    /// # Arguments
+    /// * `azmut` - Horizontal angle from origin to position from the x axis
+    /// * `polar` - Vertical angle from origin to position from the z axis
+    /// * `dst` - Distance from origin
+    ///
+    /// # Examples
+    /// ```rust
+    /// use robot::kinematics::SphereVec;
+    /// let pos = SphereVec::new(0., 0., 0.);
+    /// ```
+    #[allow(unused)]
+    pub fn new(azmut: f64, polar: f64, dst: f64) -> Self {
+        Self {
+            azmut,
+            polar,
+            distance: dst,
+            flat_distance: dst * polar.sin(),
+        }
+    }
+
+    /// updates the distance from origin
+    ///
+    /// # Arguments
+    /// * `dst` - The new distance from origin
+    ///
+    /// # Examples
+    /// ```rust
+    /// use robot::kinematics::SphereVec;
+    /// let mut pos = SphereVec::new(0., 0., 0.);
+    ///
+    /// pos.update_dst(10.);
+    ///
+    /// assert_eq!(pos.dst, 10.);
+    /// ```
+    pub fn update_dst(&mut self, dst: f64) {
+        self.distance = dst;
+        self.flat_distance = dst * self.polar.sin();
+    }
+
+    /// Converts spherical coordinates to a 3d position
+    ///
+    /// due to floating point errors the position might
+    /// not be exactly the same but it is usualy close enough
+    ///
+    /// # Examples
+    /// ```rust
+    /// use std::f64::consts::{PI, SQRT_2};
+    /// use robot::kinematics::SphereVec;
+    /// let pos = SphereVec::new(PI/2, 0., SQRT_2);
+    ///
+    /// let position = pos.to_position();
+    ///
+    /// assert_eq!(position.x.round(), 1.);
+    /// assert_eq!(position.y.round(), 1.);
+    /// assert_eq!(position.z.round(), 0.);
+    /// ```
+    pub fn to_position(&self) -> CordinateVec {
+        CordinateVec {
+            x: self.flat_distance * self.azmut.cos(),
+            y: self.flat_distance * self.azmut.sin(),
+            z: self.distance * self.polar.cos(),
+        }
+    }
+}
+
+impl Into<CordinateVec> for SphereVec {
+    /// Same as [`SphereVec::to_position`]
+    fn into(self) -> CordinateVec {
+        self.to_position()
+    }
+}
+
+impl Into<SphereVec> for CordinateVec {
+    /// Same as [`CordinateVec::to_sphere`]
+    fn into(self) -> SphereVec {
+        self.to_sphere()
+    }
+}
+
+impl Default for CordinateVec {
     fn default() -> Self {
         Self {
             x: 0.,
@@ -132,64 +278,11 @@ impl Default for Vec3D {
     }
 }
 
-impl Vec3D {
-    /// sqrt(X^2 + Z^2)
-    pub fn f_dst(&self) -> f64 {
-        (self.x.powi(2) + self.y.powi(2)).sqrt()
-    }
+impl Sub for CordinateVec {
+    type Output = CordinateVec;
 
-    /// sqrt(X^2 + Y^2 + Z^2)
-    pub fn dst(&self) -> f64 {
-        (self.x.powi(2) + self.z.powi(2) + self.z.powi(2)).sqrt()
-    }
-
-    /// arctan(x / z)
-    pub fn azmut(&self) -> f64 {
-        match self.z.signum() as i8 {
-            1 => (self.y / self.x).atan(),
-            -1 => (self.y / self.x).atan() + PI,
-            _ => 0.,
-        }
-    }
-
-    /// arctan(f_dst / y)
-    pub fn polar(&self) -> f64 {
-        match self.y.signum() as i8 {
-            1 => (self.z / self.f_dst()).atan(),
-            -1 => (self.z / self.f_dst()).atan(),
-            _ => 0.,
-        }
-    }
-
-    pub fn to_sphere(&self) -> SpherePos {
-        SpherePos {
-            azmut: self.azmut(),
-            polar: self.polar(),
-            dst: self.dst(),
-            f_dst: self.f_dst(),
-        }
-    }
-}
-
-impl SpherePos {
-    pub fn update_dst(&mut self, dst: f64) {
-        self.dst = dst;
-        self.f_dst = dst * self.polar.cos();
-    }
-    pub fn to_position(&self) -> Vec3D {
-        Vec3D {
-            x: self.f_dst * self.azmut.cos(),
-            y: self.dst * self.polar.sin(),
-            z: self.f_dst * self.azmut.sin(),
-        }
-    }
-}
-
-impl Sub for Vec3D {
-    type Output = Vec3D;
-
-    fn sub(self, rhs: Vec3D) -> Self::Output {
-        Vec3D {
+    fn sub(self, rhs: CordinateVec) -> Self::Output {
+        CordinateVec {
             x: self.x - rhs.x,
             y: self.y - rhs.y,
             z: self.z - rhs.z,
@@ -197,11 +290,11 @@ impl Sub for Vec3D {
     }
 }
 
-impl Add for Vec3D {
-    type Output = Vec3D;
+impl Add for CordinateVec {
+    type Output = CordinateVec;
 
-    fn add(self, rhs: Vec3D) -> Self::Output {
-        Vec3D {
+    fn add(self, rhs: CordinateVec) -> Self::Output {
+        CordinateVec {
             x: self.x + rhs.x,
             y: self.y + rhs.y,
             z: self.z + rhs.z,
@@ -209,9 +302,9 @@ impl Add for Vec3D {
     }
 }
 
-impl AddAssign for Vec3D {
-    fn add_assign(&mut self, rhs: Vec3D) {
-        *self = Vec3D {
+impl AddAssign for CordinateVec {
+    fn add_assign(&mut self, rhs: CordinateVec) {
+        *self = CordinateVec {
             x: self.x + rhs.x,
             y: self.y + rhs.y,
             z: self.z + rhs.z,
@@ -219,7 +312,7 @@ impl AddAssign for Vec3D {
     }
 }
 
-impl SubAssign for Vec3D {
+impl SubAssign for CordinateVec {
     fn sub_assign(&mut self, rhs: Self) {
         *self = Self {
             x: self.x - rhs.x,
@@ -229,8 +322,8 @@ impl SubAssign for Vec3D {
     }
 }
 
-impl Eq for Vec3D {}
-impl PartialEq for Vec3D {
+impl Eq for CordinateVec {}
+impl PartialEq for CordinateVec {
     fn eq(&self, other: &Self) -> bool {
         self.x == other.x && self.y == other.y && self.z == other.z
     }
@@ -240,7 +333,7 @@ impl PartialEq for Vec3D {
     }
 }
 
-impl Mul<f64> for Vec3D {
+impl Mul<f64> for CordinateVec {
     type Output = Self;
 
     fn mul(self, rhs: f64) -> Self::Output {
@@ -252,10 +345,10 @@ impl Mul<f64> for Vec3D {
     }
 }
 
-impl Mul<Vec3D> for Vec3D {
+impl Mul<CordinateVec> for CordinateVec {
     type Output = Self;
 
-    fn mul(self, rhs: Vec3D) -> Self::Output {
+    fn mul(self, rhs: CordinateVec) -> Self::Output {
         Self {
             x: self.x * rhs.x,
             y: self.y * rhs.y,
@@ -269,11 +362,11 @@ mod position {
 
     use std::f64::consts::SQRT_2;
 
-    use crate::kinematics::position::Vec3D;
+    use crate::kinematics::position::CordinateVec;
 
     #[test]
     fn to_sphere() {
-        let expected = Vec3D::new(-1., -1., -1.);
+        let expected = CordinateVec::new(-1., -1., -1.);
         let actual = expected.to_sphere().to_position();
 
         assert_eq!(expected.x, actual.x.round());
@@ -283,7 +376,7 @@ mod position {
 
     #[test]
     fn inverse_kinematics() {
-        let mut position = Vec3D::new(SQRT_2, 0., 0.);
+        let mut position = CordinateVec::new(SQRT_2, 0., 0.);
 
         let actual = position.inverse_kinematics(1., 1.).unwrap();
 
@@ -291,7 +384,7 @@ mod position {
         assert_eq!((actual.1 * 10.0f64.powi(4)).round() / 10.0f64.powi(4), 45.);
         assert_eq!((actual.2 * 10.0f64.powi(4)).round() / 10.0f64.powi(4), 90.);
 
-        let mut position = Vec3D::new(0., 0., 0.);
+        let mut position = CordinateVec::new(0., 0., 0.);
 
         let actual = position.inverse_kinematics(0., 0.);
 
@@ -300,62 +393,57 @@ mod position {
 
     #[test]
     fn addition() {
-        let a = Vec3D::new(1., 2., 3.);
-        let mut b = Vec3D::new(2., 2., 2.);
-        let c = Vec3D::new(3., 2., 1.);
+        let a = CordinateVec::new(1., 2., 3.);
+        let mut b = CordinateVec::new(2., 2., 2.);
+        let c = CordinateVec::new(3., 2., 1.);
 
-        assert_eq!(a + b, Vec3D::new(3., 4., 5.));
-        assert_eq!(a + c, Vec3D::new(4., 4., 4.));
+        assert_eq!(a + b, CordinateVec::new(3., 4., 5.));
+        assert_eq!(a + c, CordinateVec::new(4., 4., 4.));
 
         b += c;
-        assert_eq!(b, Vec3D::new(5., 4., 3.));
+        assert_eq!(b, CordinateVec::new(5., 4., 3.));
     }
 
     #[test]
     fn subtraction() {
-        let a = Vec3D::new(1., 2., 3.);
-        let mut b = Vec3D::new(2., 2., 2.);
-        let c = Vec3D::new(3., 2., 1.);
+        let a = CordinateVec::new(1., 2., 3.);
+        let mut b = CordinateVec::new(2., 2., 2.);
+        let c = CordinateVec::new(3., 2., 1.);
 
-        assert_eq!(a - b, Vec3D::new(-1., 0., 1.));
-        assert_eq!(a - c, Vec3D::new(-2., 0., 2.));
+        assert_eq!(a - b, CordinateVec::new(-1., 0., 1.));
+        assert_eq!(a - c, CordinateVec::new(-2., 0., 2.));
 
         b -= c;
 
-        assert_eq!(b, Vec3D::new(-1., 0., 1.));
+        assert_eq!(b, CordinateVec::new(-1., 0., 1.));
     }
 }
 
 #[cfg(test)]
 mod sphere_pos {
-    use crate::kinematics::position::{SpherePos, Vec3D};
+    use crate::kinematics::position::{CordinateVec, SphereVec};
     use std::f64::consts::{PI, SQRT_2};
 
     #[test]
     fn to_position() {
-        let pos = SpherePos {
+        let pos = SphereVec {
             azmut: 1.,
             polar: 1.,
-            f_dst: 0.,
-            dst: 0.,
+            flat_distance: 0.,
+            distance: 0.,
         };
 
         let actual = pos.to_position();
-        let expected = Vec3D::new(0., 0., 0.);
+        let expected = CordinateVec::new(0., 0., 0.);
 
         assert_eq!(actual, expected);
 
-        let pos = SpherePos {
-            azmut: PI / 4.,
-            polar: 0.,
-            f_dst: SQRT_2,
-            dst: SQRT_2,
-        };
-
+        let pos = SphereVec::new(PI / 4., PI / 2., 2f64.sqrt());
+        dbg!(pos);
         let actual = pos.to_position();
 
-        assert_eq!((actual.x * 10.0f64.powi(4)).round() / 10.0f64.powi(4), 1.);
-        assert_eq!((actual.y * 10.0f64.powi(4)).round() / 10.0f64.powi(4), 0.);
-        assert_eq!((actual.z * 10.0f64.powi(4)).round() / 10.0f64.powi(4), 1.);
+        assert_eq!(actual.x.round(), 1.);
+        assert_eq!(actual.y.round(), 1.);
+        assert_eq!(actual.z.round(), 0.);
     }
 }
