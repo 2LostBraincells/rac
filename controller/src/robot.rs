@@ -99,7 +99,6 @@ impl Robot {
     pub fn target_position_update(&mut self, target: Vec3D) {
         let delta = target - self.position;
         let mut sphere = delta.to_sphere();
-        dbg!(delta, sphere);
 
         // reset target position if we are close enough
         if sphere.dst < 0.01 {
@@ -109,7 +108,7 @@ impl Robot {
 
         // distance needed to stop at current velocity
         let breaking_distance = self.velocity.to_sphere().dst / (2. * self.acceleration);
-        dbg!(breaking_distance);
+        breaking_distance;
 
         // conntineously accelerate until we reach the breaking point
         if sphere.dst < breaking_distance {
