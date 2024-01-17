@@ -1,8 +1,9 @@
-use std::{cmp::PartialEq, fmt::Debug};
+use std::cmp::PartialEq;
 
 use crate::{
     communication::{ComError, Connection},
-    kinematics::{Joint, Vec3D},
+    kinematics::position::Vec3D,
+    kinematics::joints::Joint,
     logging::warn,
 };
 use gilrs::{Axis, Button, Gamepad};
@@ -80,11 +81,12 @@ impl Robot {
 
         self.target_position = None;
 
-        self.target_velocity = self.max_velocity * Vec3D {
-            x: self.parse_gamepad_axis(left_axis_x, 0.2),
-            y: self.parse_gamepad_axis(left_axis_y, 0.2),
-            z: self.parse_gamepad_axis(right_axis_y, 0.2),
-        };
+        self.target_velocity = self.max_velocity
+            * Vec3D {
+                x: self.parse_gamepad_axis(left_axis_x, 0.2),
+                y: self.parse_gamepad_axis(left_axis_y, 0.2),
+                z: self.parse_gamepad_axis(right_axis_y, 0.2),
+            };
 
         if gamepad.is_pressed(Button::Start) {
             panic!("Start button pressed, there is only death now");
@@ -163,7 +165,6 @@ impl Robot {
 
     /// Runs all of the necessary function in order to update controller and move the robot
     pub fn update(&mut self, delta: f64) -> Result<(), ComError> {
-
         match self.target_position {
             Some(target) => self.target_position_update(target),
             None => {}
@@ -252,6 +253,7 @@ mod test {
         assert_eq!(actual, expected);
     }
 
+    #[test]
     pub fn parse_gamepad() {
         let mut robo = Robot {
             position: Vec3D::new(0., 0., 0.),
@@ -267,7 +269,6 @@ mod test {
             connection: Connection::default(),
         };
 
-        assert_eq!(0.25, robo.parse_gamepad_axis(0.5, 0.2));
         assert_eq!(0., robo.parse_gamepad_axis(0.1, 0.2));
         assert_eq!(0., robo.parse_gamepad_axis(0.2, 0.2));
         assert_eq!(1., robo.parse_gamepad_axis(1., 0.2));

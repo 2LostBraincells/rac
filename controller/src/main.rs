@@ -1,10 +1,13 @@
+use crate::kinematics::{
+    joints::{DirectDrive, DirectDriveOffset, DoubleLinkage, Joint},
+    position::Vec3D,
+};
 use std::{
     thread::sleep,
     time::{Duration, Instant},
 };
 
-use gilrs::{Gilrs, GilrsBuilder};
-use kinematics::{DirectDrive, DirectDriveOffset, DoubleLinkage, Joint, Vec3D};
+use gilrs::Gilrs;
 
 use crate::robot::*;
 
@@ -14,7 +17,6 @@ mod logging;
 mod robot;
 
 fn main() {
-
     let mut robot = Robot {
         acceleration: 1040.,
         max_velocity: Vec3D::new(10., 10., 10.),
@@ -34,10 +36,10 @@ fn main() {
                 Box::new(DoubleLinkage::new(1., 10., 10., 1., 10., 20.)),
             ),
         },
-        position: Vec3D::new(0.,0.,0.),
-        velocity: Vec3D::new(0.,0.,0.),
-        target_position: Some(Vec3D::new(50.,50.,50.)),
-        target_velocity: Vec3D::new(0.,0.,0.),
+        position: Vec3D::new(0., 0., 0.),
+        velocity: Vec3D::new(0., 0., 0.),
+        target_position: Some(Vec3D::new(50., 50., 50.)),
+        target_velocity: Vec3D::new(0., 0., 0.),
         claw_open: false,
         connection: communication::Connection::new("/dev/ttyACM0", 115_200),
     };
@@ -49,7 +51,6 @@ fn main() {
     sleep(Duration::from_secs(2));
 
     let mut prev = Instant::now();
-
 
     loop {
         let delta: Duration = dbg!(Instant::now() - prev);
@@ -67,6 +68,5 @@ fn main() {
         println!("vel: {:?}", robot.velocity);
         println!("tve: {:?}", robot.target_velocity);
         println!("ang: {:#?}", robot.arm);
-
     }
 }
