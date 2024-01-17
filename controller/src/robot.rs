@@ -82,8 +82,8 @@ impl Robot {
 
         self.target_velocity = self.max_velocity * Vec3D {
             x: self.parse_gamepad_axis(left_axis_x, 0.2),
-            z: self.parse_gamepad_axis(left_axis_y, 0.2),
-            y: self.parse_gamepad_axis(right_axis_y, 0.2),
+            y: self.parse_gamepad_axis(left_axis_y, 0.2),
+            z: self.parse_gamepad_axis(right_axis_y, 0.2),
         };
 
         if gamepad.is_pressed(Button::Start) {
@@ -117,7 +117,7 @@ impl Robot {
             self.target_velocity = Vec3D::new(0., 0., 0.);
         } else {
             // accelerate
-            sphere.dst = 100.;
+            sphere.update_dst(10.);
             self.target_velocity = sphere.to_position();
         }
     }
@@ -146,7 +146,7 @@ impl Robot {
 
         // clamp distance from origin
         if sphere.dst >= self.upper_arm + self.lower_arm {
-            sphere.dst = self.upper_arm + self.lower_arm;
+            sphere.update_dst(self.upper_arm + self.lower_arm);
             self.position = sphere.to_position();
         }
     }
@@ -173,12 +173,11 @@ impl Robot {
 
         match self.target_position {
             Some(target) => self.target_position_update(target),
-            None => { }
+            None => {}
         }
 
         self.update_velocity(delta);
         self.update_position(delta);
-
         self.update_ik();
 
         let data = self.arm.to_servos().to_message();

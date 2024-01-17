@@ -435,6 +435,10 @@ impl Vec3D {
 }
 
 impl SpherePos {
+    pub fn update_dst(&mut self, dst: f64) {
+        self.dst = dst;
+        self.f_dst = dst * self.polar.cos();
+    }
     pub fn to_position(&self) -> Vec3D {
         Vec3D {
             x: self.f_dst * self.azmut.cos(),
