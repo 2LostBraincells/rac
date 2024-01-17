@@ -80,9 +80,11 @@ impl Robot {
         let left_axis_x = gamepad.value(Axis::LeftStickX) as f64;
         let left_axis_y = gamepad.value(Axis::LeftStickY) as f64;
 
-        self.target_velocity.z = self.max_velocity.z * self.parse_gamepad_axis(left_axis_y, 0.2);
-        self.target_velocity.x = self.max_velocity.x * self.parse_gamepad_axis(left_axis_x, 0.2);
-        self.target_velocity.y = self.max_velocity.y * self.parse_gamepad_axis(right_axis_y, 0.2);
+        self.target_velocity = self.max_velocity * Position {
+            x: self.parse_gamepad_axis(left_axis_x, 0.2),
+            z: self.parse_gamepad_axis(left_axis_y, 0.2),
+            y: self.parse_gamepad_axis(right_axis_y, 0.2),
+        };
 
         if gamepad.is_pressed(Button::Start) {
             panic!("Start button pressed, there is only death now");
@@ -90,17 +92,36 @@ impl Robot {
     }
 
     /// Set target velocity if a target position is set
-    pub fn update_velocity_target(&mut self) {
-        if let Some(target) = self.target_position {
-            let mut delta = target - self.position;
-            delta.cube_clamp(-10., 10.);
-            self.target_velocity = ;
+    ///
+    /// Accelerate towards the target position until within the distance required to stop
+    ///
+    /// If the target position is reached, set target position to None
+    pub fn target_position_update(&mut self, target: Position) {
+        let delta = target - self.position;
+        let mut sphere = delta.to_sphere();
+
+        // reset target position if we are close enough
+        if sphere.dst < 0.01 {
+            self.target_position = None;
+            return;
+        }
+
+        // distance needed to stop at current velocity
+        let breaking_distance = self.velocity.to_sphere().dst / (2. * self.acceleration);
+
+        // conntineously accelerate until we reach the breaking point
+        if sphere.dst < breaking_distance {
+            // breake
+            self.target_velocity = Position::new(0., 0., 0.);
+        } else {
+            // accelerate
+            sphere.dst = 1000.;
+            self.target_velocity = sphere.to_position();
         }
     }
 
     /// Update velocity based on acceleration and target velocity
     pub fn update_velocity(&mut self, delta: f64) {
-
         // actual acceleration for this update step
         let acceleration = self.acceleration * delta;
 
@@ -147,10 +168,17 @@ impl Robot {
     /// Runs all of the necessary function in order to update controller and move the robot
     pub fn update(&mut self, gamepad: &Gamepad, delta: f64) -> Result<(), ComError> {
         self.update_gamepad(gamepad);
-        self.update_velocity_target();
-        self.update_velocity(delta);
-        self.update_position(delta);
+
+        match self.target_position {
+            Some(target) => self.target_position_update(target),
+            None => {
+                self.update_velocity(delta);
+                self.update_position(delta);
+            }
+        }
+
         self.update_ik();
+
         let data = self.arm.to_servos().to_message();
         self.connection.write(&data, true)
     }

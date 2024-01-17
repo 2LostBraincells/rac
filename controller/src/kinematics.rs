@@ -432,6 +432,16 @@ impl Position {
     }
 }
 
+impl SpherePos {
+    pub fn to_position(&self) -> Position {
+        Position {
+            x: self.dst * self.azmut.cos(),
+            y: self.dst * self.polar.sin(),
+            z: self.dst * self.azmut.sin(),
+        }
+    }
+}
+
 impl Sub for Position {
     type Output = Position;
 
@@ -466,12 +476,12 @@ impl AddAssign for Position {
     }
 }
 
-impl SpherePos {
-    pub fn to_position(&self) -> Position {
-        Position {
-            x: self.dst * self.azmut.cos(),
-            y: self.dst * self.polar.sin(),
-            z: self.dst * self.azmut.sin(),
+impl SubAssign for Position {
+    fn sub_assign(&mut self, rhs: Self) {
+        *self = Self {
+            x: self.x - rhs.x,
+            y: self.y - rhs.y,
+            z: self.z - rhs.z,
         }
     }
 }
@@ -487,16 +497,6 @@ impl PartialEq for Position {
     }
 }
 
-impl SubAssign for Position {
-    fn sub_assign(&mut self, rhs: Self) {
-        *self = Self {
-            x: self.x - rhs.x,
-            y: self.y - rhs.y,
-            z: self.z - rhs.z,
-        }
-    }
-}
-
 impl Mul<f64> for Position {
     type Output = Self;
 
@@ -505,6 +505,18 @@ impl Mul<f64> for Position {
             x: self.x * rhs,
             y: self.y * rhs,
             z: self.z * rhs,
+        }
+    }
+}
+
+impl Mul<Position> for Position {
+    type Output = Self;
+
+    fn mul(self, rhs: Position) -> Self::Output {
+        Self {
+            x: self.x * rhs.x,
+            y: self.y * rhs.y,
+            z: self.z * rhs.z,
         }
     }
 }
