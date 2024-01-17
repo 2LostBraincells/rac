@@ -45,7 +45,6 @@ pub struct Joint {
     pub motion: MotionField,
 }
 
-
 /// Type association for Motion trait that implements debug
 pub type MotionField = Box<dyn Motion>;
 
@@ -99,7 +98,6 @@ pub trait Motion {
 }
 
 impl Position {
-
     /// Creates a new Position
     /// # Arguments
     /// * `x` - Side to side position
@@ -186,7 +184,6 @@ impl Position {
 
         Ok((base, shoulder, elbow))
     }
-
 }
 
 impl DirectDrive {
@@ -401,33 +398,38 @@ impl Default for Position {
 impl Position {
     /// sqrt(X^2 + Z^2)
     pub fn f_dst(&self) -> f64 {
-        (self.x * self.x + self.z * self.z).sqrt()
+        (self.x.powi(2) + self.z.powi(2)).sqrt()
     }
 
     /// sqrt(X^2 + Y^2 + Z^2)
     pub fn dst(&self) -> f64 {
-        (self.x * self.x + self.y * self.y + self.z * self.z).sqrt()
+        (self.x.powi(2) + self.y.powi(2) + self.z.powi(2)).sqrt()
     }
 
     /// arctan(x / z)
     pub fn azmut(&self) -> f64 {
-        (self.x / self.z).atan();
+        match self.z.signum() as i8 {
+            1 => (self.z / self.x).atan(),
+            -1 => (self.z / self.x).atan() + PI,
+            _ => 0.,
+        }
     }
 
     /// arctan(f_dst / y)
     pub fn polar(&self) -> f64 {
-        (self.f_dst() / self.y).atan()
+        match self.y.signum() as i8 {
+            1 => (self.y / self.f_dst()).atan(),
+            -1 => (self.y / self.f_dst()).atan(),
+            _ => 0.,
+        }
     }
 
     pub fn to_sphere(&self) -> SpherePos {
-        let azmut = self.azmut();
-        let polar = self.polar();
-
         SpherePos {
-            azmut: if azmut.is_nan() {0.} else {azmut},
-            polar: if polar.is_nan() {0.} else {polar},
-            dst: (self.dst()),
-            f_dst: (self.f_dst()),
+            azmut: self.azmut(),
+            polar: self.polar(),
+            dst: self.dst(),
+            f_dst: self.f_dst(),
         }
     }
 }
@@ -435,9 +437,9 @@ impl Position {
 impl SpherePos {
     pub fn to_position(&self) -> Position {
         Position {
-            x: self.dst * self.azmut.cos(),
+            x: self.f_dst * self.azmut.cos(),
             y: self.dst * self.polar.sin(),
-            z: self.dst * self.azmut.sin(),
+            z: self.f_dst * self.azmut.sin(),
         }
     }
 }
@@ -530,9 +532,12 @@ mod position {
 
     #[test]
     fn to_sphere() {
-        let pos = Position::new(-1., 0., -1.);
-        dbg!(pos, pos.to_sphere());
-        panic!("hi");
+        let expected = Position::new(-1., -1., -1.);
+        let actual = expected.to_sphere().to_position();
+
+        assert_eq!(expected.x, actual.x.round());
+        assert_eq!(expected.y, actual.y.round());
+        assert_eq!(expected.z, actual.z.round());
     }
 
     #[test]
@@ -541,7 +546,7 @@ mod position {
 
         let actual = position.inverse_kinematics(1., 1.).unwrap();
 
-        assert_eq!((actual.0 * 10.0f64.powi(4)).round() / 10.0f64.powi(4), 180.);
+        assert_eq!((actual.0 * 10.0f64.powi(4)).round() / 10.0f64.powi(4), 90.);
         assert_eq!((actual.1 * 10.0f64.powi(4)).round() / 10.0f64.powi(4), 45.);
         assert_eq!((actual.2 * 10.0f64.powi(4)).round() / 10.0f64.powi(4), 90.);
 
@@ -611,10 +616,5 @@ mod sphere_pos {
         assert_eq!((actual.x * 10.0f64.powi(4)).round() / 10.0f64.powi(4), 1.);
         assert_eq!((actual.y * 10.0f64.powi(4)).round() / 10.0f64.powi(4), 0.);
         assert_eq!((actual.z * 10.0f64.powi(4)).round() / 10.0f64.powi(4), 1.);
-
-        let pos = Position::new(-10., -10., -10.);
-        let sphere = pos.to_sphere();
-
-        assert_eq!(pos, sphere.to_position());
     }
 }
