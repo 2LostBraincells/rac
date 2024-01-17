@@ -9,6 +9,8 @@ const int ELBOW_PIN = 10; // temporary
 const int CLAW_PIN = 11; // temporary
 const int SERIAL_TIMEOUT = 50;
 
+bool disconnected = false;
+
 typedef struct Command {
     short base;
     short shoulder;
@@ -50,25 +52,40 @@ void setup() {
 }
 
 void loop() {
-
 }
 
 void serialEvent() {
     if (Serial.read() != '\r') return;
     Serial.readBytesUntil('\n', (char*)&message, 8);
-    
+
+    if (disconnected) {
+        if (message.base != 0x0) return;
+        if (message.shoulder!= 0x0) return;
+        if (message.elbow != 0x0) return;
+        if (message.claw != 0x0) return;
+        
+        base.attach(BASE_PIN);
+        shoulder.attach(SHOULDER_PIN);
+        elbow.attach(ELBOW_PIN);
+        claw.attach(CLAW_PIN);
+
+        disconnected = false;
+    };
+
     base.writeMicroseconds(message.base);
     shoulder.writeMicroseconds(message.shoulder);
     elbow.writeMicroseconds(message.elbow);
     claw.writeMicroseconds(message.claw);
 
-    // Serial.print("base: ");
-    // Serial.print(message.base);
-    // Serial.print(", shoulder: ");
-    // Serial.print(message.shoulder);
-    // Serial.print(", elbow: ");
-    // Serial.print(message.elbow);
-    // Serial.print(", claw: ");
-    // Serial.print(message.claw);
-    // Serial.print('\n');
+    if (message.base == 0xFFFFFFFF) return;
+    if (message.shoulder == 0xFFFFFFFF) return;
+    if (message.elbow == 0xFFFFFFFF) return;
+    if (message.base == 0xFFFFFFFF) return;
+
+    base.detach();
+    shoulder.detach();
+    elbow.detach();
+    claw.detach();
+
+    disconnected = true;
 }
