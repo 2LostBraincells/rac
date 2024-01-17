@@ -9,14 +9,14 @@ use self::triangle::a_from_lengths;
 
 /// Defines a position in 3d space
 #[derive(Debug, Copy, Clone)]
-pub struct Position {
+pub struct Vec3D {
     /// Side to side
     pub x: f64,
 
-    /// Up and down
+    /// Forward and backward
     pub y: f64,
 
-    /// Forward and backward
+    /// Up and down
     pub z: f64,
 }
 
@@ -97,12 +97,12 @@ pub trait Motion {
     fn get_pivot_angle(&self, target: f64) -> f64;
 }
 
-impl Position {
+impl Vec3D {
     /// Creates a new Position
     /// # Arguments
     /// * `x` - Side to side position
-    /// * `y` - Up and down position
-    /// * `z` - Forward and backward position
+    /// * `y` - Forward and backward position
+    /// * `z` - Up and down position
     #[allow(unused)]
     pub fn new(x: f64, y: f64, z: f64) -> Self {
         Self { x, y, z }
@@ -167,7 +167,7 @@ impl Position {
 
         let shoulder = {
             // arctan(f_dst / y)
-            let a = (spos.f_dst / self.y).atan();
+            let a = (spos.f_dst / self.z).atan();
             let b = a_from_lengths(spos.dst, lower_arm, upper_arm);
 
             if a + b > PI / 2. {
@@ -385,7 +385,7 @@ impl Default for Joint {
     }
 }
 
-impl Default for Position {
+impl Default for Vec3D {
     fn default() -> Self {
         Self {
             x: 0.,
@@ -395,22 +395,22 @@ impl Default for Position {
     }
 }
 
-impl Position {
+impl Vec3D {
     /// sqrt(X^2 + Z^2)
     pub fn f_dst(&self) -> f64 {
-        (self.x.powi(2) + self.z.powi(2)).sqrt()
+        (self.x.powi(2) + self.y.powi(2)).sqrt()
     }
 
     /// sqrt(X^2 + Y^2 + Z^2)
     pub fn dst(&self) -> f64 {
-        (self.x.powi(2) + self.y.powi(2) + self.z.powi(2)).sqrt()
+        (self.x.powi(2) + self.z.powi(2) + self.z.powi(2)).sqrt()
     }
 
     /// arctan(x / z)
     pub fn azmut(&self) -> f64 {
         match self.z.signum() as i8 {
-            1 => (self.z / self.x).atan(),
-            -1 => (self.z / self.x).atan() + PI,
+            1 => (self.y / self.x).atan(),
+            -1 => (self.y / self.x).atan() + PI,
             _ => 0.,
         }
     }
@@ -418,8 +418,8 @@ impl Position {
     /// arctan(f_dst / y)
     pub fn polar(&self) -> f64 {
         match self.y.signum() as i8 {
-            1 => (self.y / self.f_dst()).atan(),
-            -1 => (self.y / self.f_dst()).atan(),
+            1 => (self.z / self.f_dst()).atan(),
+            -1 => (self.z / self.f_dst()).atan(),
             _ => 0.,
         }
     }
@@ -435,8 +435,8 @@ impl Position {
 }
 
 impl SpherePos {
-    pub fn to_position(&self) -> Position {
-        Position {
+    pub fn to_position(&self) -> Vec3D {
+        Vec3D {
             x: self.f_dst * self.azmut.cos(),
             y: self.dst * self.polar.sin(),
             z: self.f_dst * self.azmut.sin(),
@@ -444,11 +444,11 @@ impl SpherePos {
     }
 }
 
-impl Sub for Position {
-    type Output = Position;
+impl Sub for Vec3D {
+    type Output = Vec3D;
 
-    fn sub(self, rhs: Position) -> Self::Output {
-        Position {
+    fn sub(self, rhs: Vec3D) -> Self::Output {
+        Vec3D {
             x: self.x - rhs.x,
             y: self.y - rhs.y,
             z: self.z - rhs.z,
@@ -456,11 +456,11 @@ impl Sub for Position {
     }
 }
 
-impl Add for Position {
-    type Output = Position;
+impl Add for Vec3D {
+    type Output = Vec3D;
 
-    fn add(self, rhs: Position) -> Self::Output {
-        Position {
+    fn add(self, rhs: Vec3D) -> Self::Output {
+        Vec3D {
             x: self.x + rhs.x,
             y: self.y + rhs.y,
             z: self.z + rhs.z,
@@ -468,9 +468,9 @@ impl Add for Position {
     }
 }
 
-impl AddAssign for Position {
-    fn add_assign(&mut self, rhs: Position) {
-        *self = Position {
+impl AddAssign for Vec3D {
+    fn add_assign(&mut self, rhs: Vec3D) {
+        *self = Vec3D {
             x: self.x + rhs.x,
             y: self.y + rhs.y,
             z: self.z + rhs.z,
@@ -478,7 +478,7 @@ impl AddAssign for Position {
     }
 }
 
-impl SubAssign for Position {
+impl SubAssign for Vec3D {
     fn sub_assign(&mut self, rhs: Self) {
         *self = Self {
             x: self.x - rhs.x,
@@ -488,8 +488,8 @@ impl SubAssign for Position {
     }
 }
 
-impl Eq for Position {}
-impl PartialEq for Position {
+impl Eq for Vec3D {}
+impl PartialEq for Vec3D {
     fn eq(&self, other: &Self) -> bool {
         self.x == other.x && self.y == other.y && self.z == other.z
     }
@@ -499,7 +499,7 @@ impl PartialEq for Position {
     }
 }
 
-impl Mul<f64> for Position {
+impl Mul<f64> for Vec3D {
     type Output = Self;
 
     fn mul(self, rhs: f64) -> Self::Output {
@@ -511,10 +511,10 @@ impl Mul<f64> for Position {
     }
 }
 
-impl Mul<Position> for Position {
+impl Mul<Vec3D> for Vec3D {
     type Output = Self;
 
-    fn mul(self, rhs: Position) -> Self::Output {
+    fn mul(self, rhs: Vec3D) -> Self::Output {
         Self {
             x: self.x * rhs.x,
             y: self.y * rhs.y,
@@ -528,11 +528,11 @@ mod position {
 
     use std::f64::consts::SQRT_2;
 
-    use crate::kinematics::Position;
+    use crate::kinematics::Vec3D;
 
     #[test]
     fn to_sphere() {
-        let expected = Position::new(-1., -1., -1.);
+        let expected = Vec3D::new(-1., -1., -1.);
         let actual = expected.to_sphere().to_position();
 
         assert_eq!(expected.x, actual.x.round());
@@ -542,7 +542,7 @@ mod position {
 
     #[test]
     fn inverse_kinematics() {
-        let mut position = Position::new(SQRT_2, 0., 0.);
+        let mut position = Vec3D::new(SQRT_2, 0., 0.);
 
         let actual = position.inverse_kinematics(1., 1.).unwrap();
 
@@ -550,7 +550,7 @@ mod position {
         assert_eq!((actual.1 * 10.0f64.powi(4)).round() / 10.0f64.powi(4), 45.);
         assert_eq!((actual.2 * 10.0f64.powi(4)).round() / 10.0f64.powi(4), 90.);
 
-        let mut position = Position::new(0., 0., 0.);
+        let mut position = Vec3D::new(0., 0., 0.);
 
         let actual = position.inverse_kinematics(0., 0.);
 
@@ -559,35 +559,35 @@ mod position {
 
     #[test]
     fn addition() {
-        let a = Position::new(1., 2., 3.);
-        let mut b = Position::new(2., 2., 2.);
-        let c = Position::new(3., 2., 1.);
+        let a = Vec3D::new(1., 2., 3.);
+        let mut b = Vec3D::new(2., 2., 2.);
+        let c = Vec3D::new(3., 2., 1.);
 
-        assert_eq!(a + b, Position::new(3., 4., 5.));
-        assert_eq!(a + c, Position::new(4., 4., 4.));
+        assert_eq!(a + b, Vec3D::new(3., 4., 5.));
+        assert_eq!(a + c, Vec3D::new(4., 4., 4.));
 
         b += c;
-        assert_eq!(b, Position::new(5., 4., 3.));
+        assert_eq!(b, Vec3D::new(5., 4., 3.));
     }
 
     #[test]
     fn subtraction() {
-        let a = Position::new(1., 2., 3.);
-        let mut b = Position::new(2., 2., 2.);
-        let c = Position::new(3., 2., 1.);
+        let a = Vec3D::new(1., 2., 3.);
+        let mut b = Vec3D::new(2., 2., 2.);
+        let c = Vec3D::new(3., 2., 1.);
 
-        assert_eq!(a - b, Position::new(-1., 0., 1.));
-        assert_eq!(a - c, Position::new(-2., 0., 2.));
+        assert_eq!(a - b, Vec3D::new(-1., 0., 1.));
+        assert_eq!(a - c, Vec3D::new(-2., 0., 2.));
 
         b -= c;
 
-        assert_eq!(b, Position::new(-1., 0., 1.));
+        assert_eq!(b, Vec3D::new(-1., 0., 1.));
     }
 }
 
 #[cfg(test)]
 mod sphere_pos {
-    use crate::kinematics::{Position, SpherePos};
+    use crate::kinematics::{Vec3D, SpherePos};
     use std::f64::consts::{PI, SQRT_2};
 
     #[test]
@@ -600,7 +600,7 @@ mod sphere_pos {
         };
 
         let actual = pos.to_position();
-        let expected = Position::new(0., 0., 0.);
+        let expected = Vec3D::new(0., 0., 0.);
 
         assert_eq!(actual, expected);
 

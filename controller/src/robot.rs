@@ -2,7 +2,7 @@ use std::{cmp::PartialEq, fmt::Debug};
 
 use crate::{
     communication::{ComError, Connection},
-    kinematics::{Joint, Position},
+    kinematics::{Joint, Vec3D},
     logging::warn,
 };
 use gilrs::{Axis, Button, Gamepad};
@@ -18,13 +18,13 @@ pub const MIN_SERVO: u16 = 250;
 /// Defines a robot and its physical properties
 #[derive(Debug)]
 pub struct Robot {
-    pub position: Position,
-    pub target_position: Option<Position>,
+    pub position: Vec3D,
+    pub target_position: Option<Vec3D>,
 
     // as a velocity vector
-    pub velocity: Position,
-    pub max_velocity: Position,
-    pub target_velocity: Position,
+    pub velocity: Vec3D,
+    pub max_velocity: Vec3D,
+    pub target_velocity: Vec3D,
 
     // maximum change in velocity per second
     pub acceleration: f64,
@@ -80,7 +80,7 @@ impl Robot {
         let left_axis_x = gamepad.value(Axis::LeftStickX) as f64;
         let left_axis_y = gamepad.value(Axis::LeftStickY) as f64;
 
-        self.target_velocity = self.max_velocity * Position {
+        self.target_velocity = self.max_velocity * Vec3D {
             x: self.parse_gamepad_axis(left_axis_x, 0.2),
             z: self.parse_gamepad_axis(left_axis_y, 0.2),
             y: self.parse_gamepad_axis(right_axis_y, 0.2),
@@ -96,7 +96,7 @@ impl Robot {
     /// Accelerate towards the target position until within the distance required to stop
     ///
     /// If the target position is reached, set target position to None
-    pub fn target_position_update(&mut self, target: Position) {
+    pub fn target_position_update(&mut self, target: Vec3D) {
         let delta = target - self.position;
         let mut sphere = delta.to_sphere();
         dbg!(delta, sphere);
@@ -114,7 +114,7 @@ impl Robot {
         // conntineously accelerate until we reach the breaking point
         if sphere.dst < breaking_distance {
             // breake
-            self.target_velocity = Position::new(0., 0., 0.);
+            self.target_velocity = Vec3D::new(0., 0., 0.);
         } else {
             // accelerate
             sphere.dst = 100.;
@@ -262,11 +262,11 @@ mod test {
 
     pub fn parse_gamepad() {
         let mut robo = Robot {
-            position: Position::new(0., 0., 0.),
+            position: Vec3D::new(0., 0., 0.),
             target_position: None,
-            velocity: Position::new(0., 0., 0.),
-            max_velocity: Position::new(100., 100., 100.),
-            target_velocity: Position::new(0., 0., 0.),
+            velocity: Vec3D::new(0., 0., 0.),
+            max_velocity: Vec3D::new(100., 100., 100.),
+            target_velocity: Vec3D::new(0., 0., 0.),
             acceleration: 100.,
             arm: Arm::default(),
             upper_arm: 100.,
