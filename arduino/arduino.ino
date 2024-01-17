@@ -77,10 +77,10 @@ void serialEvent() {
     elbow.writeMicroseconds(message.elbow);
     claw.writeMicroseconds(message.claw);
 
-    if (message.base == 0xFFFFFFFF) return;
-    if (message.shoulder == 0xFFFFFFFF) return;
-    if (message.elbow == 0xFFFFFFFF) return;
-    if (message.base == 0xFFFFFFFF) return;
+    if (message.base != 0xFFFFFFFF) return;
+    if (message.shoulder != 0xFFFFFFFF) return;
+    if (message.elbow != 0xFFFFFFFF) return;
+    if (message.base != 0xFFFFFFFF) return;
 
     base.detach();
     shoulder.detach();
@@ -88,4 +88,14 @@ void serialEvent() {
     claw.detach();
 
     disconnected = true;
+
+    // Serial.print("base: ");
+    // Serial.print(message.base);
+    // Serial.print(", shoulder: ");
+    // Serial.print(message.shoulder);
+    // Serial.print(", elbow: ");
+    // Serial.print(message.elbow);
+    // Serial.print(", claw: ");
+    // Serial.print(message.claw);
+    // Serial.print('\n');
 }
