@@ -107,8 +107,7 @@ impl Robot {
         }
 
         // distance needed to stop at current velocity
-        let breaking_distance = self.velocity.to_sphere().dst / (2. * self.acceleration);
-        breaking_distance;
+        let breaking_distance = self.velocity.to_sphere().dst.powi(2) / (2. * self.acceleration);
 
         // conntineously accelerate until we reach the breaking point
         if sphere.dst < breaking_distance {
