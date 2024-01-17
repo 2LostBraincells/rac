@@ -14,11 +14,10 @@ mod logging;
 mod robot;
 
 fn main() {
-    // open serial connection
 
     let mut robot = Robot {
-        acceleration: 10.,
-        max_velocity: Position::new(10., 10., 10.),
+        acceleration: 100.,
+        max_velocity: Position::new(100., 100., 100.),
         upper_arm: 100.,
         lower_arm: 100.,
         arm: Arm {
@@ -37,7 +36,7 @@ fn main() {
         },
         position: Position::new(0.,0.,0.),
         velocity: Position::new(0.,0.,0.),
-        target_position: None,
+        target_position: Some(Position::new(10.,10.,10.)),
         target_velocity: Position::new(0.,0.,0.),
         claw_open: false,
         connection: communication::Connection::new("/dev/ttyACM0", 115_200),
@@ -47,6 +46,7 @@ fn main() {
     let mut gamepad = None;
     let mut prev = Instant::now();
 
+    // open serial connection
     robot.connection.connect().expect("Could not connect");
 
     sleep(Duration::from_secs(2));
