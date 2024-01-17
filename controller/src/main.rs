@@ -16,7 +16,7 @@ mod robot;
 fn main() {
 
     let mut robot = Robot {
-        acceleration: 10.,
+        acceleration: 40.,
         max_velocity: Vec3D::new(10., 10., 10.),
         upper_arm: 100.,
         lower_arm: 100.,
@@ -44,7 +44,7 @@ fn main() {
 
     let mut gilrs = Gilrs::new().expect("Could not setup gilrs");
     let mut gamepad = None;
-    let mut prev = Instant::now();
+    let mut prev = None;
 
     // open serial connection
     robot.connection.connect().expect("Could not connect");
@@ -57,15 +57,19 @@ fn main() {
         }
 
         if let Some(gamepad_id) = gamepad {
-            let gamepad = gilrs.gamepad(gamepad_id);
-            let delta = dbg!(Instant::now() - prev);
-            prev = Instant::now();
-            match robot.update(&gamepad, delta.as_secs_f64()) {
-                Ok(it) => it,
-                Err(err) => {
-                    dbg!(err);
-                }
-            };
+            if let Some(prev) = prev {
+                let gamepad = gilrs.gamepad(gamepad_id);
+                let delta: Duration = dbg!(Instant::now() - prev);
+
+                match robot.update(&gamepad, delta.as_secs_f64()) {
+                    Ok(it) => it,
+                    Err(err) => {
+                        dbg!(err);
+                    }
+                };
+            }
+
+            prev = Some(Instant::now());
         }
 
         clearscreen::clear().unwrap();
