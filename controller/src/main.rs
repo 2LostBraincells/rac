@@ -3,7 +3,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use gilrs::Gilrs;
+use gilrs::{Gilrs, GilrsBuilder};
 use kinematics::{DirectDrive, DirectDriveOffset, DoubleLinkage, Joint, Vec3D};
 
 use crate::robot::*;
@@ -16,7 +16,7 @@ mod robot;
 fn main() {
 
     let mut robot = Robot {
-        acceleration: 40.,
+        acceleration: 1040.,
         max_velocity: Vec3D::new(10., 10., 10.),
         upper_arm: 100.,
         lower_arm: 100.,
@@ -43,35 +43,24 @@ fn main() {
     };
 
     let mut gilrs = Gilrs::new().expect("Could not setup gilrs");
-    let mut gamepad = None;
-    let mut prev = None;
-
     // open serial connection
     robot.connection.connect().expect("Could not connect");
 
     sleep(Duration::from_secs(2));
 
+    let mut prev = Instant::now();
+
+
     loop {
+        let delta: Duration = dbg!(Instant::now() - prev);
+        prev = Instant::now();
+
         if let Some(event) = gilrs.next_event() {
-            gamepad = Some(event.id);
+            let gamepad = gilrs.gamepad(event.id);
+            robot.update_gamepad(&gamepad);
         }
 
-        if let Some(gamepad_id) = gamepad {
-            if let Some(prev) = prev {
-                let gamepad = gilrs.gamepad(gamepad_id);
-                let delta: Duration = dbg!(Instant::now() - prev);
-
-                match robot.update(&gamepad, delta.as_secs_f64()) {
-                    Ok(it) => it,
-                    Err(err) => {
-                        dbg!(err);
-                    }
-                };
-            }
-
-            prev = Some(Instant::now());
-        }
-
+        let _ = robot.update(delta.as_secs_f64());
         clearscreen::clear().unwrap();
         println!("pos: {:?}", robot.position);
         println!("trg: {:?}", robot.target_position);

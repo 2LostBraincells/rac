@@ -65,8 +65,6 @@ impl Robot {
             return 0.;
         }
 
-        self.target_position = None;
-
         input.signum() * {
             let input = input.abs() - deadzone;
             input / (1. - deadzone)
@@ -79,6 +77,8 @@ impl Robot {
         let right_axis_y = gamepad.value(Axis::RightStickY) as f64;
         let left_axis_x = gamepad.value(Axis::LeftStickX) as f64;
         let left_axis_y = gamepad.value(Axis::LeftStickY) as f64;
+
+        self.target_position = None;
 
         self.target_velocity = self.max_velocity * Vec3D {
             x: self.parse_gamepad_axis(left_axis_x, 0.2),
@@ -108,9 +108,10 @@ impl Robot {
         if sphere.dst < breaking_distance {
             // breake
             self.target_position = None;
+            self.target_velocity = Vec3D::new(0., 0., 0.);
         } else {
             // accelerate
-            sphere.update_dst(100.);
+            sphere.update_dst(10000.);
             self.target_velocity = sphere.to_position();
         }
     }
@@ -161,8 +162,7 @@ impl Robot {
     }
 
     /// Runs all of the necessary function in order to update controller and move the robot
-    pub fn update(&mut self, gamepad: &Gamepad, delta: f64) -> Result<(), ComError> {
-        self.update_gamepad(gamepad);
+    pub fn update(&mut self, delta: f64) -> Result<(), ComError> {
 
         match self.target_position {
             Some(target) => self.target_position_update(target),

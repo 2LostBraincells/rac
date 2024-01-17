@@ -48,7 +48,7 @@ impl Default for Connection {
             last_write: Instant::now(),
             read_buf: Vec::new(),
             msg_buf: VecDeque::new(),
-            no_connect: false,
+            no_connect: true,
         }
     }
 }
@@ -62,7 +62,7 @@ impl Connection {
             last_write: Instant::now(),
             read_buf: Vec::new(),
             msg_buf: VecDeque::new(),
-            no_connect: false,
+            no_connect: true,
         }
     }
 
