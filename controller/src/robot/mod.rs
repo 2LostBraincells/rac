@@ -1,16 +1,13 @@
 use std::cmp::PartialEq;
-
 use crate::{
     communication::{ComError, Connection},
     kinematics::position::CordinateVec,
     kinematics::joints::Joint,
     logging::warn,
 };
-use gilrs::{Axis, Button, Gamepad};
 
-// microseconds for arduino
-const MAX_SERVO: u16 = 2400;
-const MIN_SERVO: u16 = 250;
+use gilrs::{Axis, Button, Gamepad};
+pub mod arm;
 
 /// Defines a robot and its physical properties
 #[derive(Debug)]
@@ -45,29 +42,11 @@ pub struct Robot {
     /// Represents the maximum acceleration the arm can use when moving
     pub acceleration: f64,
 
-    pub arm: Arm,
+    pub arm: arm::Arm,
     pub upper_arm: f64,
     pub lower_arm: f64,
     pub claw_open: bool,
     pub connection: Connection,
-}
-
-/// Very specific names for servos
-#[derive(Debug)]
-pub struct Arm {
-    pub base: Joint,
-    pub shoulder: Joint,
-    pub elbow: Joint,
-    pub claw: Joint,
-}
-
-/// quirky arm
-#[derive(Debug, Copy, Clone)]
-pub struct Servos {
-    pub base: u16,
-    pub shoulder: u16,
-    pub elbow: u16,
-    pub claw: u16,
 }
 
 impl Robot {
@@ -202,6 +181,19 @@ impl Robot {
     }
 }
 
+// microseconds for arduino
+const MAX_SERVO: u16 = 2400;
+const MIN_SERVO: u16 = 250;
+/// quirky arm
+#[derive(Debug, Copy, Clone)]
+pub struct Servos {
+    pub base: u16,
+    pub shoulder: u16,
+    pub elbow: u16,
+    pub claw: u16,
+}
+
+
 /// convert servo position represented as an angle into values understod by the servo
 impl Joint {
     fn into_servo(&self) -> u16 {
@@ -218,38 +210,6 @@ impl PartialEq for Joint {
     }
 }
 
-impl PartialEq for Arm {
-    fn eq(&self, other: &Self) -> bool {
-        self.base == other.base
-            && self.shoulder == other.shoulder
-            && self.elbow == other.elbow
-            && self.claw == other.claw
-    }
-}
-
-/// he's average alright
-impl Default for Arm {
-    fn default() -> Self {
-        Self {
-            base: Joint::default(),
-            shoulder: Joint::default(),
-            elbow: Joint::default(),
-            claw: Joint::default(),
-        }
-    }
-}
-
-/// Arm functions
-impl Arm {
-    pub fn to_servos(&self) -> Servos {
-        Servos {
-            base: self.base.into_servo(),
-            shoulder: self.shoulder.into_servo(),
-            elbow: self.elbow.into_servo(),
-            claw: self.claw.into_servo(),
-        }
-    }
-}
 
 impl Servos {
     pub fn to_message(&self) -> Vec<u8> {
@@ -259,6 +219,7 @@ impl Servos {
 
 #[cfg(test)]
 mod test {
+    use crate::arm::Arm;
     use super::*;
 
     #[test]

@@ -1,6 +1,9 @@
-use crate::kinematics::{
-    joints::{DirectDrive, DirectDriveOffset, DoubleLinkage, Joint},
-    position::CordinateVec,
+use crate::{
+    arm::Arm,
+    kinematics::{
+        joints::{DirectDrive, DirectDriveOffset, DoubleLinkage, Joint},
+        position::CordinateVec,
+    },
 };
 use std::{
     thread::sleep,
