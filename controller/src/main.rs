@@ -18,7 +18,7 @@ mod robot;
 
 fn main() {
     let mut robot = Robot {
-        acceleration: 1040.,
+        acceleration: 100.,
         max_velocity: CordinateVec::new(10., 10., 10.),
         upper_arm: 100.,
         lower_arm: 100.,
@@ -56,13 +56,14 @@ fn main() {
         let delta: Duration = dbg!(Instant::now() - prev);
         prev = Instant::now();
 
+        clearscreen::clear().unwrap();
+
         if let Some(event) = gilrs.next_event() {
             let gamepad = gilrs.gamepad(event.id);
             robot.update_gamepad(&gamepad);
         }
 
         let _ = robot.update(delta.as_secs_f64());
-        clearscreen::clear().unwrap();
         println!("pos: {:?}", robot.position);
         println!("trg: {:?}", robot.target_position);
         println!("vel: {:?}", robot.velocity);

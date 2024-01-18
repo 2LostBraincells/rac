@@ -8,26 +8,41 @@ use crate::{
 };
 use gilrs::{Axis, Button, Gamepad};
 
-// servo angles
-pub const MAX_ANGLE: f64 = 180.0;
-pub const MIN_ANGLE: f64 = 0.0;
-
 // microseconds for arduino
-pub const MAX_SERVO: u16 = 2400;
-pub const MIN_SERVO: u16 = 250;
+const MAX_SERVO: u16 = 2400;
+const MIN_SERVO: u16 = 250;
 
 /// Defines a robot and its physical properties
 #[derive(Debug)]
 pub struct Robot {
+    /// current head position in units
+    ///
+    /// Represents the current position of the head in 3 dimensions
+    ///
+    /// NOTE: This value should almost never be set directly, see [`Robot::target_position`]
     pub position: CordinateVec,
+
+    /// target position in units
+    ///
+    /// Represents a target position for the head to move to
     pub target_position: Option<CordinateVec>,
 
-    // as a velocity vector
+    /// velocity in units/s
+    ///
+    /// Represents the current volicity of the head in 3 dimensions
+    ///
+    /// NOTE: This value should almost never be set directly, see [`Robot::target_velocity`]
     pub velocity: CordinateVec,
+
+    /// maximum velocity in units/s
+    ///
+    /// Represents the maximum velocity the gamepad can command the head too travel at
     pub max_velocity: CordinateVec,
     pub target_velocity: CordinateVec,
 
-    // maximum change in velocity per second
+    /// acceleration in units/s^2
+    ///
+    /// Represents the maximum acceleration the arm can use when moving
     pub acceleration: f64,
 
     pub arm: Arm,
@@ -102,15 +117,23 @@ impl Robot {
         let delta = target - self.position;
         let mut sphere = delta.to_sphere();
         let acceleration = CordinateVec::new(self.acceleration, self.acceleration, self.acceleration);
+        let velocity = self.velocity.dst();
 
         // distance needed to stop at current velocity
-        let breaking_distance = dbg!(self.velocity.dst().powi(2) / (2. * acceleration.dst()));
+        let breaking_distance = dbg!(velocity.powi(2) / (2. * acceleration.dst()));
 
         // conntineously accelerate until we reach the breaking point
         if sphere.distance < breaking_distance {
             // breake
-            self.target_position = None;
             self.target_velocity = CordinateVec::new(0., 0., 0.);
+
+            if sphere.distance < 0.04 && velocity < 0.07 {
+                // we have reached the target
+                self.position = target;
+                self.velocity = CordinateVec::new(0., 0., 0.);
+                self.target_velocity = CordinateVec::new(0., 0., 0.);
+                self.target_position = None;
+            }
         } else {
             // accelerate
             sphere.update_dst(10000.);
@@ -182,8 +205,8 @@ impl Robot {
 /// convert servo position represented as an angle into values understod by the servo
 impl Joint {
     fn into_servo(&self) -> u16 {
-        let factor = (self.motion.get_pivot_angle(self.angle) - MIN_ANGLE) / MAX_ANGLE;
-        ((MAX_SERVO - MIN_SERVO) as f64 * factor + MIN_SERVO as f64) as u16
+        let factor = (self.motion.get_pivot_angle(self.angle) - self.min) / self.max;
+        ((MAX_SERVO - MIN_SERVO) as f64 * factor + self.min as f64) as u16
     }
 }
 
