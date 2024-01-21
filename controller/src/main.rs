@@ -1,9 +1,6 @@
 use crate::{
     arm::Arm,
-    kinematics::{
-        joints::{DirectDrive, DirectDriveOffset, DoubleLinkage, Joint},
-        position::CordinateVec,
-    },
+    kinematics::joints::{DirectDrive, DirectDriveOffset, DoubleLinkage, Joint},
 };
 use std::{
     thread::sleep,
@@ -11,6 +8,8 @@ use std::{
 };
 
 use gilrs::Gilrs;
+use kinematics::position::CordinateVec;
+use robot::movement::full::Full;
 
 use crate::robot::*;
 
@@ -21,8 +20,6 @@ mod robot;
 
 fn main() {
     let mut robot = Robot {
-        acceleration: 100.,
-        max_velocity: CordinateVec::new(10., 10., 10.),
         upper_arm: 100.,
         lower_arm: 100.,
         arm: Arm {
@@ -39,12 +36,18 @@ fn main() {
                 Box::new(DoubleLinkage::new(1., 10., 10., 1., 10., 20.)),
             ),
         },
-        position: CordinateVec::new(0., 0., 0.),
-        velocity: CordinateVec::new(0., 0., 0.),
-        target_position: Some(CordinateVec::new(50., 50., 50.)),
-        target_velocity: CordinateVec::new(0., 0., 0.),
         claw_open: false,
         connection: communication::Connection::new("/dev/ttyACM0", 115_200),
+        movement: movement::Movement {
+            mode: robot::movement::Mode::Full(Full {
+                position: CordinateVec::new(0., 0., 0.),
+                velocity: CordinateVec::new(0., 0., 0.),
+                target_velocity: CordinateVec::new(0., 0., 0.),
+                target_position: Some(CordinateVec::new(-50., 50., 50.)),
+                max_velocity: CordinateVec::new(100., 100., 100.),
+            }),
+            acceleration: 1000.,
+        },
     };
 
     let mut gilrs = Gilrs::new().expect("Could not setup gilrs");
@@ -67,10 +70,7 @@ fn main() {
         }
 
         let _ = robot.update(delta.as_secs_f64());
-        println!("pos: {:?}", robot.position);
-        println!("trg: {:?}", robot.target_position);
-        println!("vel: {:?}", robot.velocity);
-        println!("tve: {:?}", robot.target_velocity);
+        println!("{}", robot.movement.display());
         println!("ang: {:#?}", robot.arm);
     }
 }

@@ -17,11 +17,19 @@ pub struct CordinateVec {
     pub z: f64,
 }
 
+/// Defines a 3d position using y, z and azimuth coordinates
+#[derive(Debug, Copy, Clone)]
+pub struct MixedVec {
+    pub y: f64,
+    pub z: f64,
+    pub azimuth: f64,
+}
+
 /// Defines a position using spherical coordinates
 #[derive(Debug, Copy, Clone)]
 pub struct SphereVec {
     /// Horizontal angle from origin to position from the x axis
-    pub azmut: f64,
+    pub azimuth: f64,
 
     /// Vertical angle from origin to position from the z axis
     pub polar: f64,
@@ -84,7 +92,7 @@ impl CordinateVec {
     /// let arm = position.inverse_kinematics(10,10);
     /// ```
     pub fn inverse_kinematics(
-        &mut self,
+        &self,
         upper_arm: f64,
         lower_arm: f64,
     ) -> Result<(f64, f64, f64), ()> {
@@ -92,7 +100,7 @@ impl CordinateVec {
         let spos = &self.to_sphere();
 
         // base angle
-        let base = spos.azmut.to_degrees() + 90.;
+        let base = spos.azimuth.to_degrees() + 90.;
 
         // elbow angle
         let elbow = a_from_lengths(upper_arm, lower_arm, spos.distance).to_degrees();
@@ -132,14 +140,14 @@ impl CordinateVec {
     ///
     /// sqrt(X^2 + Y^2 + Z^2)
     pub fn dst(&self) -> f64 {
-        (self.x.powi(2) + self.z.powi(2) + self.z.powi(2)).sqrt()
+        (self.x.powi(2) + self.y.powi(2) + self.z.powi(2)).sqrt()
     }
 
     /// Calculates the horizontal angle from origin to position from the x axis
     ///
     /// arctan(x / z)
-    pub fn azmut(&self) -> f64 {
-        match self.y.signum() as i8 {
+    pub fn azimuth(&self) -> f64 {
+        match self.x.signum() as i8 {
             1 => (self.y / self.x).atan(),
             -1 => (self.y / self.x).atan() + PI,
             _ => 0.,
@@ -148,7 +156,7 @@ impl CordinateVec {
 
     /// Calculates the vertical angle from origin to position from the z axis
     ///
-    /// arctan(f_dst / y)
+    /// arctan(f_dst / z)
     pub fn polar(&self) -> f64 {
         match self.z.signum() as i8 {
             1 => (self.f_dst() / self.z).atan(),
@@ -163,6 +171,7 @@ impl CordinateVec {
     /// not be exactly right but it is usualy close enough
     ///
     /// # Examples
+    ///
     /// ```rust
     /// use std::f64::consts::{PI, SQRT_2};
     /// use robot::kinematics::Position;
@@ -171,14 +180,14 @@ impl CordinateVec {
     ///
     /// let sphere = position.to_sphere();
     ///
-    /// assert_eq!(sphere.azmut, PI/2);
+    /// assert_eq!(sphere.azimuth, PI/2);
     /// assert_eq!(sphere.polar, 0.);
     /// assert_eq!(sphere.dst, SQRT_2);
     /// assert_eq!(sphere.f_dst, SQRT_2);
     /// ```
     pub fn to_sphere(&self) -> SphereVec {
         SphereVec {
-            azmut: self.azmut(),
+            azimuth: self.azimuth(),
             polar: self.polar(),
             distance: self.dst(),
             flat_distance: self.f_dst(),
@@ -190,7 +199,7 @@ impl SphereVec {
     /// Creates a new position
     ///
     /// # Arguments
-    /// * `azmut` - Horizontal angle from origin to position from the x axis
+    /// * `azimuth` - Horizontal angle from origin to position from the x axis
     /// * `polar` - Vertical angle from origin to position from the z axis
     /// * `dst` - Distance from origin
     ///
@@ -200,9 +209,9 @@ impl SphereVec {
     /// let pos = SphereVec::new(0., 0., 0.);
     /// ```
     #[allow(unused)]
-    pub fn new(azmut: f64, polar: f64, dst: f64) -> Self {
+    pub fn new(azimuth: f64, polar: f64, dst: f64) -> Self {
         Self {
-            azmut,
+            azimuth,
             polar,
             distance: dst,
             flat_distance: dst * polar.sin(),
@@ -247,9 +256,28 @@ impl SphereVec {
     /// ```
     pub fn to_position(&self) -> CordinateVec {
         CordinateVec {
-            x: self.flat_distance * self.azmut.cos(),
-            y: self.flat_distance * self.azmut.sin(),
+            x: self.flat_distance * self.azimuth.cos(),
+            y: self.flat_distance * self.azimuth.sin(),
             z: self.distance * self.polar.cos(),
+        }
+    }
+}
+
+impl MixedVec {
+    pub fn to_position(&self) -> CordinateVec {
+        CordinateVec {
+            x: self.azimuth.cos() * self.y,
+            y: self.azimuth.sin() * self.y,
+            z: self.z,
+        }
+    }
+
+    pub fn to_sphere(&self) -> SphereVec {
+        SphereVec {
+            azimuth: self.azimuth,
+            polar: (self.z/self.y).atan(),
+            distance: (self.y.powi(2) + self.z.powi(2)).sqrt(),
+            flat_distance: self.y,
         }
     }
 }
@@ -364,9 +392,42 @@ mod position {
 
     use crate::kinematics::position::CordinateVec;
 
+
+    #[test]
+    fn properties() {
+        let position = CordinateVec::new(3., 4., 5.);
+        let square = (3*3 + 4*4 + 5*5) as f64;
+
+        assert_eq!(position.x, 3.);
+        assert_eq!(position.y, 4.);
+        assert_eq!(position.z, 5.);
+        assert_eq!(position.f_dst(), 5.);
+        assert_eq!(position.dst(), square.sqrt());
+        assert_eq!(position.polar(), 45f64.to_radians());
+        assert_eq!(position.azimuth().to_degrees().round(), 53.);
+
+        let position = CordinateVec::new(-3., 4., -5.);
+
+        assert_eq!(position.x, -3.);
+        assert_eq!(position.y, 4.);
+        assert_eq!(position.z, -5.);
+        assert_eq!(position.f_dst(), 5.);
+        assert_eq!(position.dst(), square.sqrt());
+        assert_eq!(position.polar(), 135f64.to_radians());
+        assert_eq!(position.azimuth().to_degrees().round(), 180.-53.);
+    }
+
     #[test]
     fn to_sphere() {
+
         let expected = CordinateVec::new(-1., -1., -1.);
+        let actual = expected.to_sphere().to_position();
+
+        assert_eq!(expected.x, actual.x.round());
+        assert_eq!(expected.y, actual.y.round());
+        assert_eq!(expected.z, actual.z.round());
+
+        let expected = CordinateVec::new(-1., 1., 1.);
         let actual = expected.to_sphere().to_position();
 
         assert_eq!(expected.x, actual.x.round());
@@ -376,7 +437,7 @@ mod position {
 
     #[test]
     fn inverse_kinematics() {
-        let mut position = CordinateVec::new(SQRT_2, 0., 0.);
+        let position = CordinateVec::new(SQRT_2, 0., 0.);
 
         let actual = position.inverse_kinematics(1., 1.).unwrap();
 
@@ -384,7 +445,7 @@ mod position {
         assert_eq!((actual.1 * 10.0f64.powi(4)).round() / 10.0f64.powi(4), 45.);
         assert_eq!((actual.2 * 10.0f64.powi(4)).round() / 10.0f64.powi(4), 90.);
 
-        let mut position = CordinateVec::new(0., 0., 0.);
+        let position = CordinateVec::new(0., 0., 0.);
 
         let actual = position.inverse_kinematics(0., 0.);
 
@@ -422,12 +483,12 @@ mod position {
 #[cfg(test)]
 mod sphere_pos {
     use crate::kinematics::position::{CordinateVec, SphereVec};
-    use std::f64::consts::{PI, SQRT_2};
+    use std::f64::consts::PI;
 
     #[test]
     fn to_position() {
         let pos = SphereVec {
-            azmut: 1.,
+            azimuth: 1.,
             polar: 1.,
             flat_distance: 0.,
             distance: 0.,
