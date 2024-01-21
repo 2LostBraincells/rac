@@ -134,6 +134,46 @@ impl MovementMode for Full {
 
     fn display(&self) -> String {
         let mut string = String::new();
+        string.push_str(
+            format!(
+                "\
+        |              [Full]             |\n\
+        |-Position------------------------|\n\
+        |   x: {:<8.3} {}        |\n\
+        |   y: {:<8.3} {}        |\n\
+        |   z: {:<8.3} {}        |\n\
+        |                                 |\n\
+        |-Velocity------------------------|\n\
+        |   x: {:<8.3} [{:^8.3}]        |\n\
+        |   y: {:<8.3} [{:^8.3}]        |\n\
+        |   z: {:<8.3} [{:^8.3}]        |\n\
+        |                                 |\n\
+        +---------------------------------+\n\
+        ",
+                self.position.x,
+                match self.target_position {
+                    Some(target) => format!("[{:^8.3}]", target.x),
+                    None => String::from("          "),
+                },
+                self.position.y,
+                match self.target_position {
+                    Some(target) => format!("[{:^8.3}]", target.y),
+                    None => String::from("          "),
+                },
+                self.position.z,
+                match self.target_position {
+                    Some(target) => format!("[{:^8.3}]", target.z),
+                    None => String::from("          "),
+                },
+                self.velocity.x,
+                self.target_velocity.x,
+                self.velocity.y,
+                self.target_velocity.y,
+                self.velocity.z,
+                self.target_velocity.z,
+            )
+            .as_str(),
+        );
         string
     }
 }
