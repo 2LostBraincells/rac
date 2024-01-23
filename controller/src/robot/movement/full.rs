@@ -103,7 +103,7 @@ impl MovementMode for Full {
     }
 
     fn into_full(self) -> Full {
-        todo!()
+        self.clone()
     }
 
     /// Convert to medium mode
@@ -129,7 +129,7 @@ impl MovementMode for Full {
     }
 
     fn into_noassist(self) -> NoAssist {
-        todo!()
+        todo!("NoAssist is not implemented for Full")
     }
 
     fn display(&self) -> String {

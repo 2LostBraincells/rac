@@ -20,15 +20,24 @@ mod robot;
 
 fn main() {
     let mut robot = Robot {
-        upper_arm: 100.,
-        lower_arm: 100.,
+        upper_arm: 275.,
+        lower_arm: 279.,
         arm: Arm {
             base: Joint::new(0., 180., Box::new(DirectDriveOffset { offset: 90. })),
             claw: Joint::new(0., 180., Box::new(DirectDrive::new())),
             shoulder: Joint::new(
                 0.,
                 180.,
-                Box::new(DoubleLinkage::new(1., 10., 10., 1., 10., 20.)),
+                Box::new({
+                    DoubleLinkage {
+                        connection_radial_offset: 24.,
+                        connection_linear_offset: 48.,
+                        controll_pivot_horizontal_offset: 63.,
+                        controll_pivot_vertical_offset: 2.5,
+                        controller_pivot_rod_length: 50.,
+                        connection_rod_length: 15.,
+                    }
+                }),
             ),
             elbow: Joint::new(
                 0.,
@@ -40,13 +49,13 @@ fn main() {
         connection: communication::Connection::new("/dev/ttyACM0", 115_200),
         movement: movement::Movement {
             mode: robot::movement::Mode::Full(Full {
-                position: CordinateVec::new(0., 0., 0.),
+                position: CordinateVec::new(100., 100., 100.),
                 velocity: CordinateVec::new(0., 0., 0.),
                 target_velocity: CordinateVec::new(0., 0., 0.),
-                target_position: Some(CordinateVec::new(-50., 50., 50.)),
+                target_position: None,
                 max_velocity: CordinateVec::new(100., 100., 100.),
             }),
-            acceleration: 1000.,
+            acceleration: 10.,
         },
     };
 
