@@ -1,6 +1,6 @@
 use crate::{
     arm::Arm,
-    kinematics::joints::{DirectDrive, DirectDriveOffset, DoubleLinkage, Joint},
+    kinematics::joints::{DirectDrive, DoubleLinkage, Joint},
 };
 use std::{
     thread::sleep,
@@ -23,7 +23,7 @@ fn main() {
         upper_arm: 275.,
         lower_arm: 279.,
         arm: Arm {
-            base: Joint::new(0., 180., Box::new(DirectDriveOffset { offset: 90. })),
+            base: Joint::new(0., 180., Box::new(DirectDrive::new())),
             claw: Joint::new(0., 180., Box::new(DirectDrive::new())),
             shoulder: Joint::new(
                 0.,
@@ -49,10 +49,10 @@ fn main() {
         connection: communication::Connection::new("/dev/ttyACM0", 115_200),
         movement: movement::Movement {
             mode: robot::movement::Mode::Full(Full {
-                position: CordinateVec::new(100., 100., 100.),
+                position: CordinateVec::new(100., 100., 10.),
                 velocity: CordinateVec::new(0., 0., 0.),
                 target_velocity: CordinateVec::new(0., 0., 0.),
-                target_position: None,
+                target_position: Some(CordinateVec::new(100., -100., 10.)),
                 max_velocity: CordinateVec::new(100., 100., 100.),
             }),
             acceleration: 10.,

@@ -3,7 +3,6 @@ use crate::kinematics::triangle;
 use core::{fmt::Debug, f64::consts::PI};
 
 /// A arm joint with limits and functions for calculating pivot angle
-#[derive(Debug)]
 pub struct Joint {
     pub angle: f64,
     pub min: f64,
@@ -187,6 +186,17 @@ impl Motion for DirectDriveOffset {
 impl Motion for GearDrive {
     fn get_pivot_angle(&self, target: f64) -> f64 {
         target * self.gear_ratio
+    }
+}
+
+impl Debug for Joint {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Joint")
+            .field("angle", &self.angle)
+            .field("min", &self.min)
+            .field("max", &self.max)
+            .field("servo_angle", &self.motion.get_pivot_angle(self.angle))
+            .finish()
     }
 }
 
