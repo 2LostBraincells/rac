@@ -450,6 +450,13 @@ mod position {
         let actual = position.inverse_kinematics(0., 0.);
 
         assert!(actual.is_err());
+
+        let position = CordinateVec::new(0., 400., 200.);
+
+        let actual = position.inverse_kinematics(275., 279.).unwrap();
+
+        assert_eq!(actual.1.round(), 62.);
+        assert_eq!(actual.2.round(), 108.);
     }
 
     #[test]

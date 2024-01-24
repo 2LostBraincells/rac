@@ -52,7 +52,7 @@ fn main() {
                 position: CordinateVec::new(0., 300., 300.),
                 velocity: CordinateVec::new(0., 0., 0.),
                 target_velocity: CordinateVec::new(0., 0., 0.),
-                target_position: None,
+                target_position: Some(CordinateVec::new(0., 400., 200.)),
                 max_velocity: CordinateVec::new(100., 100., 100.),
             }),
             acceleration: 10.,
