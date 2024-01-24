@@ -7,7 +7,7 @@
 /// 3 = info
 /// 4 = debug
 /// 5 = verbose
-pub const LOG_LEVEL: u8 = 3;
+pub const LOG_LEVEL: u8 = 5;
 
 pub fn error(message: &'static str) {
     if LOG_LEVEL < 1 {

@@ -1,6 +1,5 @@
-
 use crate::kinematics::triangle;
-use core::{fmt::Debug, f64::consts::PI};
+use core::{f64::consts::PI, fmt::Debug};
 
 /// A arm joint with limits and functions for calculating pivot angle
 pub struct Joint {
@@ -100,7 +99,7 @@ impl DoubleLinkage {
     /// let (angle, distance) = linkage.connection_offset();
     /// ```
     pub fn connection_offset(&self) -> (f64, f64) {
-        let angle = (self.connection_radial_offset / self.connection_linear_offset).atan();
+        let angle = (self.connection_linear_offset / self.connection_radial_offset).atan();
         let distance =
             (self.connection_radial_offset.powi(2) + self.connection_linear_offset.powi(2)).sqrt();
 
@@ -122,7 +121,7 @@ impl DoubleLinkage {
     /// ```
     pub fn controller_offset(&self) -> (f64, f64) {
         let angle =
-            (self.controll_pivot_horizontal_offset / self.controll_pivot_vertical_offset).atan();
+            (self.controll_pivot_vertical_offset / self.controll_pivot_horizontal_offset).atan();
         let distance = (self.controll_pivot_horizontal_offset.powi(2)
             + self.controll_pivot_vertical_offset.powi(2))
         .sqrt();
@@ -153,7 +152,7 @@ impl Motion for DoubleLinkage {
         let connection = self.connection_offset();
         let controller = self.controller_offset();
 
-        let inner_target_angle = PI - target - connection.0;
+        let inner_target_angle = PI - (target.to_radians() + connection.0 + controller.0);
 
         let connection_to_controller = triangle::length_from_two_lengths_and_angle(
             inner_target_angle,
@@ -170,7 +169,7 @@ impl Motion for DoubleLinkage {
 
             let y = triangle::a_from_lengths(connection_to_controller, controller.1, connection.1);
 
-            x + y
+            x + y - controller.0
         };
 
         angle.to_degrees()
@@ -216,5 +215,33 @@ impl Default for Joint {
             max: 180.,
             motion: Box::new(DirectDrive::new()),
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::kinematics::joints::{DoubleLinkage, Motion};
+
+    #[test]
+    fn hoint() {
+        let linkage = DoubleLinkage {
+            connection_radial_offset: 10.,
+            connection_linear_offset: 2.,
+            controll_pivot_horizontal_offset: 10.,
+            controll_pivot_vertical_offset: 1.,
+            controller_pivot_rod_length: 7.,
+            connection_rod_length: 10.,
+        };
+
+        let controller = linkage.controller_offset();
+        assert_eq!(controller.0.to_degrees().round(), 6., "controller angle");
+        assert_eq!(controller.1.round(), 10., "controller distance");
+
+        let connection = linkage.connection_offset();
+        assert_eq!(connection.0.to_degrees().round(), 11., "connection angle");
+        assert_eq!(connection.1.round(), 10., "connection distance");
+
+        let servo_angle = linkage.get_pivot_angle(60.);
+        assert_eq!(servo_angle.round(), 58.);
     }
 }

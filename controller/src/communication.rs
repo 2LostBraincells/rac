@@ -62,7 +62,7 @@ impl Connection {
             last_write: Instant::now(),
             read_buf: Vec::new(),
             msg_buf: VecDeque::new(),
-            no_connect: true,
+            no_connect: false,
         }
     }
 
@@ -121,7 +121,10 @@ impl Connection {
 
         match port.write(data) {
             Ok(_) => Ok(()),
-            Err(err) => Err(ComError::Error(err)),
+            Err(err) => {
+                println!("Error while writing: {:?}", err);
+                Err(ComError::Error(err))
+            },
         }
     }
 
@@ -196,3 +199,4 @@ impl Connection {
         Ok(self.msg_buf.pop_front())
     }
 }
+

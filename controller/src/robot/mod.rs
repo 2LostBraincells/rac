@@ -84,7 +84,7 @@ pub struct Servos {
 impl Joint {
     fn into_servo(&self) -> u16 {
         let factor = (self.motion.get_pivot_angle(self.angle) - self.min) / self.max;
-        ((MAX_SERVO - MIN_SERVO) as f64 * factor + self.min as f64) as u16
+        dbg!(((MAX_SERVO - MIN_SERVO) as f64 * factor + self.min as f64) as u16)
     }
 }
 
